@@ -10,7 +10,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
+import { ChatModal } from '@/components/chat-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -32,6 +34,7 @@ export default function HomeScreen() {
   const [category, setCategory] = useState<EventCategory>('all');
   const [dealFilter, setDealFilter] = useState<'all' | 'sell' | 'trade'>('all');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [chatListing, setChatListing] = useState<Listing | null>(null);
 
   const filteredListings = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -65,8 +68,8 @@ export default function HomeScreen() {
               style={styles.logoImage}
             />
           </View>
-          <Pressable style={styles.createButton}>
-            <ThemedText style={styles.createButtonText}>Lägg upp</ThemedText>
+          <Pressable style={styles.createButton} onPress={() => router.push('/sell')}>
+            <ThemedText style={styles.createButtonText}>+ Lägg upp</ThemedText>
           </Pressable>
         </View>
 
@@ -146,7 +149,15 @@ export default function HomeScreen() {
         />
       </SafeAreaView>
 
-      <ListingModal listing={selectedListing} onClose={() => setSelectedListing(null)} />
+      <ListingModal
+        listing={selectedListing}
+        onClose={() => setSelectedListing(null)}
+        onChat={(l: Listing) => {
+          setSelectedListing(null);
+          setChatListing(l);
+        }}
+      />
+      <ChatModal listing={chatListing} onClose={() => setChatListing(null)} />
     </ThemedView>
   );
 }
@@ -252,7 +263,15 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
   );
 }
 
-function ListingModal({ listing, onClose }: { listing: Listing | null; onClose: () => void }) {
+function ListingModal({
+  listing,
+  onClose,
+  onChat,
+}: {
+  listing: Listing | null;
+  onClose: () => void;
+  onChat: (listing: Listing) => void;
+}) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const nationName = listing ? NATIONS[listing.nationId] ?? listing.nationId : '';
@@ -300,8 +319,8 @@ function ListingModal({ listing, onClose }: { listing: Listing | null; onClose: 
                 </>
               )}
 
-              <Pressable style={styles.primaryAction}>
-                <ThemedText style={styles.primaryActionText}>Kontakta säljaren</ThemedText>
+              <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
+                <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
               </Pressable>
             </>
           )}
