@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   FlatList,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -57,11 +58,12 @@ export default function HomeScreen() {
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={[styles.header, { borderBottomColor: theme.backgroundSelected }]}>
-          <View>
-            <ThemedText type="small" themeColor="textSecondary">
-              Lunds studentbiljetter
-            </ThemedText>
-            <ThemedText style={styles.logo}>Tixet</ThemedText>
+          <View style={styles.logoBlock}>
+            <Image
+              source={require('@/assets/images/tixet-logo.png')}
+              resizeMode="contain"
+              style={styles.logoImage}
+            />
           </View>
           <Pressable style={styles.createButton}>
             <ThemedText style={styles.createButtonText}>Lägg upp</ThemedText>
@@ -88,7 +90,7 @@ export default function HomeScreen() {
                   styles.searchInput,
                   {
                     backgroundColor: theme.backgroundElement,
-                    borderColor: theme.backgroundSelected,
+                    borderColor: '#E39E7233',
                     color: theme.text,
                   },
                 ]}
@@ -166,8 +168,8 @@ function FilterChip({
       style={[
         styles.chip,
         {
-          backgroundColor: active ? '#1F1713' : theme.backgroundElement,
-          borderColor: active ? '#1F1713' : theme.backgroundSelected,
+          backgroundColor: active ? '#FFC8A5' : theme.backgroundElement,
+          borderColor: active ? '#E39E7273' : theme.backgroundSelected,
         },
       ]}>
       <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>{label}</ThemedText>
@@ -329,27 +331,34 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.94)',
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: 7,
+    shadowColor: '#E39E72',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
   },
-  logo: {
-    color: '#E47D43',
-    fontSize: 34,
-    fontWeight: '800',
-    letterSpacing: 0,
-    lineHeight: 38,
+  logoBlock: {
+    height: 48,
+    justifyContent: 'center',
+    width: 124,
+  },
+  logoImage: {
+    height: 48,
+    width: 124,
   },
   createButton: {
-    backgroundColor: '#1F1713',
+    backgroundColor: '#1D2430',
     borderRadius: 8,
     paddingHorizontal: Spacing.three,
     paddingVertical: 10,
   },
   createButtonText: {
-    color: '#FFF9F4',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -369,7 +378,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     fontSize: 16,
-    minHeight: 48,
+    minHeight: 44,
     paddingHorizontal: Spacing.three,
   },
   chipRow: {
@@ -377,20 +386,21 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   chip: {
-    borderRadius: 999,
+    borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 9,
+    paddingVertical: 7,
   },
   chipText: {
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#687283',
+    fontSize: 13,
+    fontWeight: '600',
   },
   chipTextActive: {
-    color: '#FFF9F4',
+    color: '#1D2430',
   },
   segment: {
-    backgroundColor: '#F2E4D7',
+    backgroundColor: '#EEF0F4',
     borderRadius: 8,
     flexDirection: 'row',
     padding: 3,
@@ -411,13 +421,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   segmentTextActive: {
-    color: '#1F1713',
+    color: '#1D2430',
   },
   card: {
     borderRadius: 8,
     borderWidth: 1,
     gap: Spacing.two,
     padding: Spacing.three,
+    shadowColor: '#E39E72',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 14,
   },
   cardTopRow: {
     alignItems: 'center',
@@ -426,14 +440,14 @@ const styles = StyleSheet.create({
   },
   emblem: {
     alignItems: 'center',
-    backgroundColor: '#F6E7D9',
+    backgroundColor: '#FFC8A54D',
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
   emblemText: {
-    color: '#9D4D2B',
+    color: '#7A4A2F',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -455,13 +469,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   quantityPill: {
-    backgroundColor: '#FFD6BE',
+    backgroundColor: '#FFC8A54D',
     borderRadius: 999,
     paddingHorizontal: Spacing.two,
     paddingVertical: 4,
   },
   quantityText: {
-    color: '#5C2A18',
+    color: '#1D2430',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -494,10 +508,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   hotBadge: {
-    backgroundColor: '#FFE8DC',
+    backgroundColor: '#FFC8A54D',
   },
   hotBadgeText: {
-    color: '#A54C25',
+    color: '#7A4A2F',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -528,7 +542,7 @@ const styles = StyleSheet.create({
   },
   modalHandle: {
     alignSelf: 'center',
-    backgroundColor: '#D6C6B9',
+    backgroundColor: '#D5DAE2',
     borderRadius: 999,
     height: 4,
     width: 42,
@@ -546,13 +560,13 @@ const styles = StyleSheet.create({
     lineHeight: 34,
   },
   closeButton: {
-    backgroundColor: '#F6E7D9',
+    backgroundColor: '#F0F1F4',
     borderRadius: 8,
     paddingHorizontal: Spacing.two,
     paddingVertical: 8,
   },
   closeButtonText: {
-    color: '#6E3B27',
+    color: '#1D2430',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -561,7 +575,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   stat: {
-    backgroundColor: '#F8EEE6',
+    backgroundColor: '#F6F7F9',
     borderRadius: 8,
     flex: 1,
     padding: Spacing.two,
@@ -571,7 +585,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   sectionLabel: {
-    color: '#9D4D2B',
+    color: '#9F6A49',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -582,13 +596,13 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     alignItems: 'center',
-    backgroundColor: '#E47D43',
+    backgroundColor: '#1D2430',
     borderRadius: 8,
     minHeight: 52,
     justifyContent: 'center',
   },
   primaryActionText: {
-    color: '#FFF9F4',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
   },
