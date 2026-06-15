@@ -13,7 +13,7 @@ export const KNOWN_LUND_EVENTS: LundEvent[] = [
   { id: 'siste-april', name: 'Siste April', category: 'valborg' },
   { id: 'nast-siste-april', name: 'Näst Siste April', category: 'valborg' },
   { id: 'tegelbruket', name: 'Tegelbruket', category: 'valborg' },
-  { id: 't-bar', name: 'T-Bar', category: 'valborg' },
+  { id: 't-bar', name: 'T-Bar', organizer: 'AF-borgen', category: 'valborg' },
   { id: 'skvalborg', name: 'Skvalborg', category: 'valborg' },
   { id: '1-maj', name: '1 Maj', category: 'valborg' },
 

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -25,9 +26,9 @@ import {
   EventCategory,
   Listing,
   NATIONS,
+  fetchActiveListings,
   formatRelativeTime,
   getEventCategory,
-  mockListings,
 } from '@/lib/tickets';
 
 export default function HomeScreen() {
@@ -38,11 +39,37 @@ export default function HomeScreen() {
   const [dealFilter, setDealFilter] = useState<'all' | 'sell' | 'trade'>('all');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [chatListing, setChatListing] = useState<Listing | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
+  const [listingsError, setListingsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchActiveListings()
+      .then((items) => {
+        if (!isMounted) return;
+        setListings(items);
+        setListingsError(null);
+      })
+      .catch((error: Error) => {
+        if (!isMounted) return;
+        setListingsError(error.message);
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setListingsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredListings = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return mockListings
+    return listings
       .filter((listing) => !listing.isSold)
       .filter((listing) => category === 'all' || getEventCategory(listing) === category)
       .filter((listing) => {
@@ -58,7 +85,7 @@ export default function HomeScreen() {
         );
       })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [category, dealFilter, search]);
+  }, [category, dealFilter, listings, search]);
 
   return (
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
@@ -141,7 +168,7 @@ export default function HomeScreen() {
               </View>
 
               <ThemedText type="small" themeColor="textSecondary">
-                {filteredListings.length} aktiva annonser
+                {listingsLoading ? 'Hämtar annonser...' : `${filteredListings.length} aktiva annonser`}
               </ThemedText>
             </View>
           }
@@ -150,10 +177,18 @@ export default function HomeScreen() {
           )}
           ListEmptyComponent={
             <ThemedView type="backgroundElement" style={styles.emptyState}>
-              <ThemedText style={styles.emptyTitle}>Inga biljetter hittades</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.emptyCopy}>
-                Prova en bredare sökning eller byt filter.
-              </ThemedText>
+              {listingsLoading ? (
+                <ActivityIndicator size="small" color={theme.textSecondary} />
+              ) : (
+                <>
+                  <ThemedText style={styles.emptyTitle}>
+                    {listingsError ? 'Kunde inte hämta annonser' : 'Inga biljetter hittades'}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.emptyCopy}>
+                    {listingsError ?? 'Prova en bredare sökning eller byt filter.'}
+                  </ThemedText>
+                </>
+              )}
             </ThemedView>
           }
         />

@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase';
+
 export type DealType = 'sell' | 'trade' | 'both';
 export type EventCategory = 'all' | 'valborg' | 'karneval' | 'forkop' | 'other';
 
@@ -67,6 +69,7 @@ export const NATIONS: Record<string, string> = {
   helsingkrona: 'Helsingkrona nation',
   malmo: 'Malmö nation',
   lunds: 'Lunds nation',
+  afborgen: 'AF-borgen',
   karneval: 'Lundakarnevalen',
   vg: 'Västgöta nation',
 };
@@ -94,6 +97,56 @@ export function formatRelativeTime(date: Date) {
 
   const days = Math.round(hours / 24);
   return `${days} d sedan`;
+}
+
+type ListingRow = {
+  id: string;
+  event_name: string;
+  ticket_type: string;
+  quantity: number;
+  deal_type: DealType;
+  price: number | string | null;
+  trade_description: string | null;
+  description: string | null;
+  contact_method: string | null;
+  contact_info: string | null;
+  created_at: string;
+  nation_id: string;
+  status: 'active' | 'sold' | 'archived';
+};
+
+function mapListing(row: ListingRow): Listing {
+  return {
+    id: row.id,
+    eventName: row.event_name,
+    ticketType: row.ticket_type,
+    quantity: row.quantity,
+    dealType: row.deal_type,
+    price: row.price == null ? undefined : Number(row.price),
+    tradeDescription: row.trade_description ?? undefined,
+    description: row.description ?? '',
+    contactMethod: row.contact_method ?? '',
+    contactInfo: row.contact_info ?? '',
+    createdAt: new Date(row.created_at),
+    isSold: row.status === 'sold',
+    nationId: row.nation_id,
+  };
+}
+
+export async function fetchActiveListings(): Promise<Listing[]> {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      'id,event_name,ticket_type,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,nation_id,status',
+    )
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => mapListing(row as ListingRow));
 }
 
 export const mockListings: Listing[] = [

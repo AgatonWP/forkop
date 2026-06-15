@@ -7,6 +7,7 @@ const NATION_IMAGES: Record<string, ReturnType<typeof require>> = {
   helsingkrona: require('@/assets/images/nations/helsingkrona.png'),
   malmo: require('@/assets/images/nations/malmo.png'),
   lunds: require('@/assets/images/nations/lunds.png'),
+  afborgen: require('@/assets/images/nations/afborgen.png'),
   vg: require('@/assets/images/nations/vastgota.png'),
   ostgota: require('@/assets/images/nations/ostgota.png'),
   blekingska: require('@/assets/images/nations/blekingska.png'),

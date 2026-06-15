@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NationEmblem } from '@/components/nation-emblem';
@@ -7,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/lib/auth';
 import { Listing, NATIONS, mockListings } from '@/lib/tickets';
 
 const activeListings = mockListings.slice(0, 3);
@@ -21,6 +23,45 @@ const soldListings: Listing[] = [
 export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
+  const { initializing, user, signIn, signOut, signUp } = useAuth();
+  const [email, setEmail] = useState('tixet@tixet.se');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [submitting, setSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  async function handleAuthSubmit() {
+    if (!email.trim() || !password) return;
+
+    setSubmitting(true);
+    setAuthError(null);
+
+    try {
+      if (mode === 'signin') {
+        await signIn(email.trim(), password);
+      } else {
+        await signUp(email.trim(), password);
+      }
+      setPassword('');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Något gick fel. Försök igen.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSignOut() {
+    setSubmitting(true);
+    setAuthError(null);
+
+    try {
+      await signOut();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Kunde inte logga ut.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <ThemedView style={styles.screen}>
@@ -42,34 +83,108 @@ export default function ProfileScreen() {
           },
         ]}>
         <View style={styles.container}>
-          <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <ThemedText style={styles.avatarText}>S</ThemedText>
+          {initializing ? (
+            <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+              <ActivityIndicator size="small" color={theme.textSecondary} />
             </View>
-            <View style={styles.profileCopy}>
-              <ThemedText numberOfLines={1} style={styles.profileName}>
-                Student
-              </ThemedText>
-              <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-                student@tixet.se
-              </ThemedText>
+          ) : user ? (
+            <>
+              <View style={styles.profileRow}>
+                <View style={styles.avatar}>
+                  <ThemedText style={styles.avatarText}>
+                    {(user.email?.[0] ?? 'T').toUpperCase()}
+                  </ThemedText>
+                </View>
+                <View style={styles.profileCopy}>
+                  <ThemedText numberOfLines={1} style={styles.profileName}>
+                    {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Tixet'}
+                  </ThemedText>
+                  <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
+                    {user.email}
+                  </ThemedText>
+                </View>
+                <Pressable
+                  disabled={submitting}
+                  onPress={handleSignOut}
+                  style={[styles.outlineButton, { borderColor: theme.backgroundSelected, opacity: submitting ? 0.6 : 1 }]}>
+                  <ThemedText style={styles.outlineButtonText}>Logga ut</ThemedText>
+                </Pressable>
+              </View>
+
+              <ProfileSection title="Aktiva annonser" count={activeListings.length}>
+                {activeListings.map((listing) => (
+                  <ListingRow key={listing.id} listing={listing} />
+                ))}
+              </ProfileSection>
+
+              <ProfileSection title="Sålda annonser" count={soldListings.length}>
+                {soldListings.map((listing) => (
+                  <ListingRow key={listing.id} listing={listing} sold />
+                ))}
+              </ProfileSection>
+            </>
+          ) : (
+            <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+              <View style={styles.authHeader}>
+                <ThemedText style={styles.authTitle}>
+                  {mode === 'signin' ? 'Logga in' : 'Skapa konto'}
+                </ThemedText>
+                <Pressable onPress={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
+                  <ThemedText style={styles.authSwitch}>
+                    {mode === 'signin' ? 'Skapa konto' : 'Logga in'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              <TextInput
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={theme.textSecondary}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.backgroundSelected,
+                    color: theme.text,
+                  },
+                ]}
+                value={email}
+              />
+              <TextInput
+                autoCapitalize="none"
+                onChangeText={setPassword}
+                placeholder="Lösenord"
+                placeholderTextColor={theme.textSecondary}
+                secureTextEntry
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.backgroundSelected,
+                    color: theme.text,
+                  },
+                ]}
+                value={password}
+              />
+
+              {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
+
+              <Pressable
+                disabled={submitting || !email.trim() || !password}
+                onPress={handleAuthSubmit}
+                style={[
+                  styles.primaryButton,
+                  { opacity: submitting || !email.trim() || !password ? 0.55 : 1 },
+                ]}>
+                <ThemedText style={styles.primaryButtonText}>
+                  {submitting ? 'Vänta...' : mode === 'signin' ? 'Logga in' : 'Skapa konto'}
+                </ThemedText>
+              </Pressable>
             </View>
-            <Pressable style={[styles.outlineButton, { borderColor: theme.backgroundSelected }]}>
-              <ThemedText style={styles.outlineButtonText}>Logga ut</ThemedText>
-            </Pressable>
-          </View>
-
-          <ProfileSection title="Aktiva annonser" count={activeListings.length}>
-            {activeListings.map((listing) => (
-              <ListingRow key={listing.id} listing={listing} />
-            ))}
-          </ProfileSection>
-
-          <ProfileSection title="Sålda annonser" count={soldListings.length}>
-            {soldListings.map((listing) => (
-              <ListingRow key={listing.id} listing={listing} sold />
-            ))}
-          </ProfileSection>
+          )}
         </View>
       </ScrollView>
     </ThemedView>
@@ -218,6 +333,55 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,
+  },
+  authPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: Spacing.three,
+    padding: Spacing.three,
+  },
+  authHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  authTitle: {
+    color: '#1D2430',
+    fontSize: 21,
+    fontWeight: '800',
+    lineHeight: 27,
+  },
+  authSwitch: {
+    color: '#4F6FB7',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  input: {
+    borderRadius: 8,
+    borderWidth: 1,
+    fontSize: 16,
+    minHeight: 46,
+    paddingHorizontal: Spacing.three,
+  },
+  errorText: {
+    color: '#C84646',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#1D2430',
+    borderRadius: 8,
+    minHeight: 46,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
   outlineButton: {
     alignItems: 'center',

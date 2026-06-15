@@ -20,7 +20,7 @@ export const NATIONS_LIST: Nation[] = [
   { id: 'wermlands', name: 'Wermlands Nation', shortName: 'WN', color: '#1D4ED8' },
   { id: 'smalands', name: 'Smålands Nation', shortName: 'SM', color: '#15803D' },
   { id: 'karneval', name: 'Lundakarnevalen', shortName: 'LK', color: '#DC2626' },
-  { id: 'tbar', name: 'T-Bar', shortName: 'TB', color: '#C2410C' },
+  { id: 'afborgen', name: 'AF-borgen', shortName: 'AF', color: '#C2410C' },
   { id: 'mejeriet', name: 'Mejeriet', shortName: 'MJ', color: '#6D28D9' },
   { id: 'stadsparken', name: 'Stadsparken', shortName: 'SP', color: '#16A34A' },
   { id: 'other', name: 'Annat', shortName: '??', color: '#6B7280' },

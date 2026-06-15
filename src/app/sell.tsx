@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,15 +18,32 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { LundEvent, fetchLundEvents } from '@/lib/stuk-events';
 import { DealType } from '@/lib/tickets';
 
 
 const TICKET_TYPES = ['Inträde', 'Sittning', 'VIP', 'Helgpass', 'Gasque', 'Förköp', 'Annan'];
 
+function getNationId(event: LundEvent | null, eventName: string) {
+  const haystack = `${event?.organizer ?? ''} ${eventName}`.toLowerCase();
+
+  if (haystack.includes('af-borgen') || haystack.includes('af borgen') || haystack.includes('t-bar')) return 'afborgen';
+  if (haystack.includes('helsingkrona')) return 'helsingkrona';
+  if (haystack.includes('göteborg') || haystack.includes('goteborg')) return 'goteborgs';
+  if (haystack.includes('malmö') || haystack.includes('malmo')) return 'malmo';
+  if (haystack.includes('västgöta') || haystack.includes('vastgota') || haystack.includes('vg')) return 'vg';
+  if (haystack.includes('karneval')) return 'karneval';
+  if (haystack.includes('lunds nation')) return 'lunds';
+
+  return 'other';
+}
+
 export default function SellScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   const [events, setEvents] = useState<LundEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -41,6 +59,8 @@ export default function SellScreen() {
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [ticketTypePickerOpen, setTicketTypePickerOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLundEvents().then((data) => {
@@ -51,11 +71,51 @@ export default function SellScreen() {
 
   const eventDisplayName = selectedEvent?.name ?? customEventName;
   const canSubmit =
+    !!user &&
     eventDisplayName.trim().length > 0 &&
-    (dealType === 'trade' || price.trim().length > 0);
+    (dealType === 'trade' || Number(price) > 0) &&
+    !submitting;
 
-  function handleSubmit() {
-    if (!canSubmit) return;
+  function resetForm() {
+    setSelectedEvent(null);
+    setCustomEventName('');
+    setTicketType('Inträde');
+    setQuantity(1);
+    setDealType('sell');
+    setPrice('');
+    setTradeWant('');
+    setDescription('');
+    setSubmitError(null);
+  }
+
+  async function handleSubmit() {
+    if (!user || !canSubmit) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    const { error } = await supabase.from('listings').insert({
+      user_id: user.id,
+      event_name: eventDisplayName.trim(),
+      ticket_type: ticketType,
+      quantity,
+      deal_type: dealType,
+      price: dealType === 'trade' ? null : Number(price),
+      trade_description: dealType === 'sell' ? null : tradeWant.trim() || null,
+      description: description.trim(),
+      contact_method: '',
+      contact_info: '',
+      nation_id: getNationId(selectedEvent, eventDisplayName),
+    });
+
+    setSubmitting(false);
+
+    if (error) {
+      setSubmitError(error.message);
+      return;
+    }
+
+    resetForm();
     setSubmitted(true);
   }
 
@@ -73,7 +133,10 @@ export default function SellScreen() {
             </ThemedText>
             <Pressable
               style={[styles.primaryButton, { marginTop: Spacing.four }]}
-              onPress={() => setSubmitted(false)}>
+              onPress={() => {
+                setSubmitted(false);
+                router.push('/');
+              }}>
               <ThemedText style={styles.primaryButtonText}>Lägg upp en till</ThemedText>
             </Pressable>
           </View>
@@ -100,6 +163,18 @@ export default function SellScreen() {
             ]}
             keyboardShouldPersistTaps="handled">
             <View style={styles.formContainer}>
+              {!user && (
+                <View style={[styles.authNotice, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                  <ThemedText style={styles.authNoticeTitle}>Logga in först</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.authNoticeCopy}>
+                    Du behöver vara inloggad för att lägga upp en annons.
+                  </ThemedText>
+                  <Pressable style={styles.secondaryButton} onPress={() => router.push('/explore')}>
+                    <ThemedText style={styles.secondaryButtonText}>Gå till Profil</ThemedText>
+                  </Pressable>
+                </View>
+              )}
+
               {/* Event picker */}
               <FormSection label="Vilket event?">
                 <Pressable
@@ -252,14 +327,25 @@ export default function SellScreen() {
 
               {/* Submit */}
               <Pressable
+                disabled={!canSubmit}
                 onPress={handleSubmit}
                 style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}>
-                <ThemedText style={styles.primaryButtonText}>Lägg upp annons</ThemedText>
+                <ThemedText style={styles.primaryButtonText}>
+                  {submitting ? 'Publicerar...' : 'Lägg upp annons'}
+                </ThemedText>
               </Pressable>
+
+              {submitError && (
+                <ThemedText style={styles.errorText}>
+                  {submitError}
+                </ThemedText>
+              )}
 
               {!canSubmit && (
                 <ThemedText type="small" themeColor="textSecondary" style={styles.validationHint}>
-                  Fyll i event{dealType !== 'trade' ? ' och pris' : ''} för att lägga upp.
+                  {user
+                    ? `Fyll i event${dealType !== 'trade' ? ' och pris' : ''} för att lägga upp.`
+                    : 'Logga in för att lägga upp.'}
                 </ThemedText>
               )}
             </View>
@@ -536,6 +622,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     width: '100%',
   },
+  authNotice: {
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: Spacing.two,
+    padding: Spacing.three,
+  },
+  authNoticeTitle: {
+    color: '#1D2430',
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  authNoticeCopy: {
+    lineHeight: 19,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF0F4',
+    borderRadius: 8,
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+  },
+  secondaryButtonText: {
+    color: '#1D2430',
+    fontSize: 13,
+    fontWeight: '800',
+  },
 
   formSection: {
     gap: Spacing.two,
@@ -687,6 +802,13 @@ const styles = StyleSheet.create({
   validationHint: {
     textAlign: 'center',
     marginTop: -Spacing.two,
+  },
+  errorText: {
+    color: '#C84646',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+    textAlign: 'center',
   },
 
   // Modals
