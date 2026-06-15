@@ -3,9 +3,11 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   View,
 } from 'react-native';
@@ -13,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 
 import { ChatModal } from '@/components/chat-modal';
+import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -58,19 +61,26 @@ export default function HomeScreen() {
   }, [category, dealFilter, search]);
 
   return (
-    <ThemedView style={styles.screen}>
+    <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={[styles.header, { borderBottomColor: theme.backgroundSelected }]}>
-          <View style={styles.logoBlock}>
-            <Image
-              source={require('@/assets/images/tixet-logo.png')}
-              resizeMode="contain"
-              style={styles.logoImage}
-            />
+        <View style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
+          <View style={styles.announcementBar}>
+            <ThemedText style={styles.announcementText}>
+              Appen är på väg och lanseras inom kort.
+            </ThemedText>
           </View>
-          <Pressable style={styles.createButton} onPress={() => router.push('/sell')}>
-            <ThemedText style={styles.createButtonText}>+ Lägg upp</ThemedText>
-          </Pressable>
+          <View style={styles.headerRow}>
+            <View style={styles.logoBlock}>
+              <Image
+                source={require('@/assets/images/tixet-logo.png')}
+                resizeMode="contain"
+                style={styles.logoImage}
+              />
+            </View>
+            <Pressable style={styles.createButton} onPress={() => router.push('/sell')}>
+              <ThemedText style={styles.createButtonText}>+ Lägg upp</ThemedText>
+            </Pressable>
+          </View>
         </View>
 
         <FlatList
@@ -220,13 +230,16 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         },
       ]}>
       <View style={styles.cardTopRow}>
-        <View style={styles.emblem}>
-          <ThemedText style={styles.emblemText}>{nationName.slice(0, 1)}</ThemedText>
-        </View>
+        <NationEmblem nationId={listing.nationId} />
         <View style={styles.cardTitleBlock}>
           <View style={styles.titleRow}>
             <ThemedText numberOfLines={1} style={styles.cardTitle}>
-              {listing.eventName}
+              {listing.eventName.includes(' – ') ? (
+                <>
+                  {listing.eventName.slice(0, listing.eventName.indexOf(' – '))}
+                  <Text style={styles.cardTitleSub}>{' · ' + listing.eventName.slice(listing.eventName.indexOf(' – ') + 3)}</Text>
+                </>
+              ) : listing.eventName}
             </ThemedText>
             <View style={styles.quantityPill}>
               <ThemedText style={styles.quantityText}>{listing.quantity} st</ThemedText>
@@ -341,6 +354,11 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+const webGradient = Platform.OS === 'web' ? {
+  backgroundImage: 'radial-gradient(ellipse 80% 40% at 50% 0%, rgb(227 158 114 / 0.35), transparent)',
+  backgroundAttachment: 'fixed',
+} : {};
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -349,17 +367,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.94)',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 7,
     shadowColor: '#E39E72',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 18,
+  },
+  announcementBar: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(227,158,114,0.15)',
+    borderBottomColor: 'rgba(227,158,114,0.3)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 6,
+  },
+  announcementText: {
+    color: '#7A4A2F',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  headerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 7,
   },
   logoBlock: {
     height: 48,
@@ -457,18 +491,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
   },
-  emblem: {
-    alignItems: 'center',
-    backgroundColor: '#FFC8A54D',
-    borderRadius: 18,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  emblemText: {
-    color: '#7A4A2F',
-    fontSize: 16,
-    fontWeight: '800',
+  cardTitleSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#687283',
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   cardTitleBlock: {
     flex: 1,

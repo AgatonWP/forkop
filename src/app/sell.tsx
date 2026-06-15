@@ -85,7 +85,7 @@ export default function SellScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={[styles.header, { borderBottomColor: theme.backgroundSelected }]}>
+        <View style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
           <ThemedText style={styles.headerTitle}>Lägg upp annons</ThemedText>
         </View>
 
@@ -511,7 +511,6 @@ const styles = StyleSheet.create({
 
   header: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.94)',
     borderBottomWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
     minHeight: 56,

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -23,7 +24,7 @@ export default function ProfileScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected }]}>
+      <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
           <Pressable onPress={() => router.push('/')} style={styles.backButton}>
             <ThemedText style={styles.backButtonText}>‹</ThemedText>
@@ -109,9 +110,7 @@ function ListingRow({ listing, sold = false }: { listing: Listing; sold?: boolea
           opacity: sold ? 0.6 : 1,
         },
       ]}>
-      <View style={styles.emblem}>
-        <ThemedText style={styles.emblemText}>{nationName.slice(0, 1)}</ThemedText>
-      </View>
+      <NationEmblem nationId={listing.nationId} />
 
       <View style={styles.listingCopy}>
         <ThemedText numberOfLines={1} style={styles.listingTitle}>
@@ -151,7 +150,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerInner: {
@@ -254,19 +252,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     minHeight: 62,
     padding: Spacing.two,
-  },
-  emblem: {
-    alignItems: 'center',
-    backgroundColor: '#FFC8A54D',
-    borderRadius: 18,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  emblemText: {
-    color: '#7A4A2F',
-    fontSize: 15,
-    fontWeight: '800',
   },
   listingCopy: {
     flex: 1,
