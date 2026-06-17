@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Image,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -28,8 +30,13 @@ import {
   NATIONS,
   fetchActiveListings,
   formatRelativeTime,
+  formatTicketQuantity,
   getEventCategory,
 } from '@/lib/tickets';
+
+const VISIBLE_EVENT_CATEGORIES = EVENT_CATEGORIES.filter(
+  (item) => item.id !== 'valborg' && item.id !== 'karneval',
+);
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -91,11 +98,6 @@ export default function HomeScreen() {
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
-          <View style={styles.announcementBar}>
-            <ThemedText style={styles.announcementText}>
-              Appen är på väg och lanseras inom kort.
-            </ThemedText>
-          </View>
           <View style={styles.headerRow}>
             <View style={styles.logoBlock}>
               <Image
@@ -104,8 +106,13 @@ export default function HomeScreen() {
                 style={styles.logoImage}
               />
             </View>
-            <Pressable style={styles.createButton} onPress={() => router.push('/sell')}>
-              <ThemedText style={styles.createButtonText}>+ Lägg upp</ThemedText>
+            <Pressable
+              style={({ pressed }) => [
+                styles.createButton,
+                pressed && styles.createButtonPressed,
+              ]}
+              onPress={() => router.push('/sell')}>
+              <ThemedText style={styles.createButtonText}>Lägg upp</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -138,7 +145,7 @@ export default function HomeScreen() {
 
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.chipRow}>
-                  {EVENT_CATEGORIES.map((item) => (
+                  {VISIBLE_EVENT_CATEGORIES.map((item) => (
                     <FilterChip
                       key={item.id}
                       label={item.label}
@@ -277,7 +284,9 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
               ) : listing.eventName}
             </ThemedText>
             <View style={styles.quantityPill}>
-              <ThemedText style={styles.quantityText}>{listing.quantity} st</ThemedText>
+              <ThemedText style={styles.quantityText}>
+                {formatTicketQuantity(listing.quantity)} st
+              </ThemedText>
             </View>
           </View>
           <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
@@ -322,57 +331,122 @@ function ListingModal({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const nationName = listing ? NATIONS[listing.nationId] ?? listing.nationId : '';
+
+  useEffect(() => {
+    sheetTranslateY.setValue(0);
+  }, [listing?.id, sheetTranslateY]);
+
+  const closeFromDrag = useCallback(() => {
+    Animated.timing(sheetTranslateY, {
+      toValue: 420,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      sheetTranslateY.setValue(0);
+      onClose();
+    });
+  }, [onClose, sheetTranslateY]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderMove: (_, gesture) => {
+          sheetTranslateY.setValue(Math.max(0, gesture.dy));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 90 || gesture.vy > 1.1) {
+            closeFromDrag();
+            return;
+          }
+
+          Animated.spring(sheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 5,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(sheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 5,
+          }).start();
+        },
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [closeFromDrag, sheetTranslateY],
+  );
 
   return (
     <Modal animationType="slide" transparent visible={!!listing} onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <ThemedView
-          type="backgroundElement"
+        <Pressable
+          accessibilityLabel="Stäng annons"
+          onPress={onClose}
+          style={styles.modalBackdropPressable}
+        />
+        <Animated.View
           style={[
-            styles.modalSheet,
-            {
-              paddingBottom: insets.bottom + Spacing.four,
-              borderColor: theme.backgroundSelected,
-            },
+            styles.modalAnimatedSheet,
+            { transform: [{ translateY: sheetTranslateY }] },
           ]}>
-          {listing && (
-            <>
-              <View style={styles.modalHandle} />
-              <View style={styles.modalHeader}>
-                <View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {nationName}
-                  </ThemedText>
-                  <ThemedText style={styles.modalTitle}>{listing.eventName}</ThemedText>
+          <ThemedView
+            type="backgroundElement"
+            style={[
+              styles.modalSheet,
+              {
+                paddingBottom: insets.bottom + Spacing.four,
+                borderColor: theme.backgroundSelected,
+              },
+            ]}>
+            {listing && (
+              <>
+                <View style={styles.modalDragArea} {...panResponder.panHandlers}>
+                  <View style={styles.modalHandle} />
                 </View>
-                <Pressable onPress={onClose} style={styles.closeButton}>
-                  <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
+                <View style={styles.modalHeader}>
+                  <View>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {nationName}
+                    </ThemedText>
+                    <ThemedText style={styles.modalTitle}>{listing.eventName}</ThemedText>
+                  </View>
+                  <Pressable onPress={onClose} style={styles.closeButton}>
+                    <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
+                  </Pressable>
+                </View>
+
+                <View style={styles.modalStats}>
+                  <Stat label="Antal" value={`${formatTicketQuantity(listing.quantity)} st`} />
+                  <Stat label="Typ" value={listing.ticketType} />
+                  <Stat label="Upplagd" value={formatRelativeTime(listing.createdAt)} />
+                </View>
+
+                <ThemedText style={styles.sectionLabel}>Beskrivning</ThemedText>
+                <ThemedText style={styles.description}>{listing.description}</ThemedText>
+
+                {listing.tradeDescription && (
+                  <>
+                    <ThemedText style={styles.sectionLabel}>Vill byta mot</ThemedText>
+                    <ThemedText style={styles.description}>{listing.tradeDescription}</ThemedText>
+                  </>
+                )}
+
+                <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
+                  <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
                 </Pressable>
-              </View>
-
-              <View style={styles.modalStats}>
-                <Stat label="Antal" value={`${listing.quantity} st`} />
-                <Stat label="Typ" value={listing.ticketType} />
-                <Stat label="Upplagd" value={formatRelativeTime(listing.createdAt)} />
-              </View>
-
-              <ThemedText style={styles.sectionLabel}>Beskrivning</ThemedText>
-              <ThemedText style={styles.description}>{listing.description}</ThemedText>
-
-              {listing.tradeDescription && (
-                <>
-                  <ThemedText style={styles.sectionLabel}>Vill byta mot</ThemedText>
-                  <ThemedText style={styles.description}>{listing.tradeDescription}</ThemedText>
-                </>
-              )}
-
-              <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
-                <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
-              </Pressable>
-            </>
-          )}
-        </ThemedView>
+              </>
+            )}
+          </ThemedView>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -390,8 +464,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const webGradient = Platform.OS === 'web' ? {
-  backgroundImage: 'radial-gradient(ellipse 80% 40% at 50% 0%, rgb(227 158 114 / 0.35), transparent)',
-  backgroundAttachment: 'fixed',
+  backgroundImage: 'linear-gradient(180deg, #F8F9FB 0%, #F6F7F9 42%, #F4F6F8 100%)',
 } : {};
 
 const styles = StyleSheet.create({
@@ -403,52 +476,49 @@ const styles = StyleSheet.create({
   },
   header: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#E39E72',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-  },
-  announcementBar: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(227,158,114,0.15)',
-    borderBottomColor: 'rgba(227,158,114,0.3)',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 6,
-  },
-  announcementText: {
-    color: '#7A4A2F',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textAlign: 'center',
+    shadowColor: '#1D2430',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
   },
   headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingVertical: 7,
+    paddingVertical: 12,
   },
   logoBlock: {
-    height: 48,
+    height: 40,
     justifyContent: 'center',
-    width: 124,
+    width: 108,
   },
   logoImage: {
-    height: 48,
-    width: 124,
+    height: 40,
+    width: 108,
   },
   createButton: {
     backgroundColor: '#1D2430',
-    borderRadius: 8,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    shadowColor: '#1D2430',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  },
+  createButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.98 }],
   },
   createButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   listContent: {
     alignSelf: 'center',
@@ -611,9 +681,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalBackdrop: {
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(29,36,48,0.24)',
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  modalBackdropPressable: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalAnimatedSheet: {
+    width: '100%',
   },
   modalSheet: {
     borderTopLeftRadius: 18,
@@ -621,6 +697,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     gap: Spacing.three,
     padding: Spacing.three,
+  },
+  modalDragArea: {
+    alignItems: 'center',
+    marginHorizontal: -Spacing.three,
+    marginTop: -Spacing.two,
+    paddingBottom: Spacing.two,
+    paddingTop: Spacing.two,
   },
   modalHandle: {
     alignSelf: 'center',

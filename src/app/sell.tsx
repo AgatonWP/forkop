@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -21,10 +23,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { LundEvent, fetchLundEvents } from '@/lib/stuk-events';
-import { DealType } from '@/lib/tickets';
+import {
+  DealType,
+  MORE_THAN_MAX_TICKET_QUANTITY,
+  formatTicketQuantity,
+} from '@/lib/tickets';
 
 
 const TICKET_TYPES = ['Inträde', 'Sittning', 'VIP', 'Helgpass', 'Gasque', 'Förköp', 'Annan'];
+const DEPRIORITIZED_EVENT_CATEGORIES = new Set<LundEvent['category']>(['valborg', 'karneval']);
 
 function getNationId(event: LundEvent | null, eventName: string) {
   const haystack = `${event?.organizer ?? ''} ${eventName}`.toLowerCase();
@@ -230,10 +237,12 @@ export default function SellScreen() {
                     <ThemedText style={styles.stepperIcon}>−</ThemedText>
                   </Pressable>
                   <View style={[styles.stepperValue, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-                    <ThemedText style={styles.stepperValueText}>{quantity} st</ThemedText>
+                    <ThemedText style={styles.stepperValueText}>
+                      {formatTicketQuantity(quantity)} st
+                    </ThemedText>
                   </View>
                   <Pressable
-                    onPress={() => setQuantity((q) => Math.min(20, q + 1))}
+                    onPress={() => setQuantity((q) => Math.min(MORE_THAN_MAX_TICKET_QUANTITY, q + 1))}
                     style={[styles.stepperButton, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
                     <ThemedText style={styles.stepperIcon}>+</ThemedText>
                   </Pressable>
@@ -434,10 +443,67 @@ function EventPickerModal({
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      sheetTranslateY.setValue(0);
+    }
+  }, [sheetTranslateY, visible]);
+
+  const closeFromDrag = useCallback(() => {
+    Animated.timing(sheetTranslateY, {
+      toValue: 420,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      sheetTranslateY.setValue(0);
+      onClose();
+    });
+  }, [onClose, sheetTranslateY]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderMove: (_, gesture) => {
+          sheetTranslateY.setValue(Math.max(0, gesture.dy));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 90 || gesture.vy > 1.1) {
+            closeFromDrag();
+            return;
+          }
+
+          Animated.spring(sheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 5,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(sheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 5,
+          }).start();
+        },
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [closeFromDrag, sheetTranslateY],
+  );
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return events;
+    if (!q) {
+      return events.filter((e) => !DEPRIORITIZED_EVENT_CATEGORIES.has(e.category));
+    }
+
     return events.filter(
       (e) =>
         e.name.toLowerCase().includes(q) ||
@@ -452,83 +518,105 @@ function EventPickerModal({
       transparent
       onRequestClose={onClose}
       onShow={() => setTimeout(() => inputRef.current?.focus(), 100)}>
-      <View style={styles.modalBackdrop}>
-        <ThemedView
-          type="backgroundElement"
-          style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.three }]}>
-          <View style={styles.modalHandle} />
-
-          <View style={styles.modalHeader}>
-            <ThemedText style={styles.modalTitle}>Välj event</ThemedText>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
-            </Pressable>
-          </View>
-
-          <TextInput
-            ref={inputRef}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Sök event..."
-            placeholderTextColor={theme.textSecondary}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+        style={styles.modalBackdrop}>
+        <Pressable
+          accessibilityLabel="Stäng eventväljare"
+          onPress={onClose}
+          style={styles.modalBackdropPressable}
+        />
+        <Animated.View
+          style={[
+            styles.modalAnimatedSheet,
+            { transform: [{ translateY: sheetTranslateY }] },
+          ]}>
+          <ThemedView
+            type="backgroundElement"
             style={[
-              styles.searchInput,
-              {
-                backgroundColor: theme.background,
-                borderColor: theme.backgroundSelected,
-                color: theme.text,
-              },
-            ]}
-          />
+              styles.modalSheet,
+              styles.eventPickerSheet,
+              { paddingBottom: insets.bottom + Spacing.three },
+            ]}>
+            <View style={styles.modalDragArea} {...panResponder.panHandlers}>
+              <View style={styles.modalHandle} />
+            </View>
 
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            style={styles.eventList}
-            keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={
-              query.trim().length > 0 ? (
-                <Pressable
-                  onPress={() => onCustom(query.trim())}
-                  style={[styles.eventRow, styles.customEventRow, { borderColor: theme.backgroundSelected }]}>
-                  <View style={styles.eventRowContent}>
-                    <ThemedText style={styles.eventName}>"{query.trim()}"</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Lägg till som eget event
-                    </ThemedText>
-                  </View>
-                  <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
-                </Pressable>
-              ) : null
-            }
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => onSelect(item)}
-                style={({ pressed }) => [
-                  styles.eventRow,
-                  {
-                    backgroundColor:
-                      selected?.id === item.id ? '#FFC8A520' : 'transparent',
-                    borderColor: theme.backgroundSelected,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}>
-                <View style={styles.eventRowContent}>
-                  <ThemedText style={styles.eventName}>{item.name}</ThemedText>
-                  {item.organizer && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {item.organizer}
-                    </ThemedText>
-                  )}
-                </View>
-                {selected?.id === item.id && (
-                  <ThemedText style={styles.checkmark}>✓</ThemedText>
-                )}
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Välj event</ThemedText>
+              <Pressable onPress={onClose} style={styles.closeButton}>
+                <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
               </Pressable>
-            )}
-          />
-        </ThemedView>
-      </View>
+            </View>
+
+            <TextInput
+              ref={inputRef}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Sök event..."
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: theme.background,
+                  borderColor: theme.backgroundSelected,
+                  color: theme.text,
+                },
+              ]}
+            />
+
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.eventListContent}
+              style={styles.eventList}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={
+                query.trim().length > 0 ? (
+                  <Pressable
+                    onPress={() => onCustom(query.trim())}
+                    style={[styles.eventRow, styles.customEventRow, { borderColor: theme.backgroundSelected }]}>
+                    <View style={styles.eventRowContent}>
+                      <ThemedText style={styles.eventName}>{`"${query.trim()}"`}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        Lägg till som eget event
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
+                  </Pressable>
+                ) : null
+              }
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => onSelect(item)}
+                  style={({ pressed }) => [
+                    styles.eventRow,
+                    {
+                      backgroundColor:
+                        selected?.id === item.id ? '#FFC8A520' : 'transparent',
+                      borderColor: theme.backgroundSelected,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}>
+                  <View style={styles.eventRowContent}>
+                    <ThemedText style={styles.eventName}>{item.name}</ThemedText>
+                    {item.organizer && (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {item.organizer}
+                      </ThemedText>
+                    )}
+                  </View>
+                  {selected?.id === item.id && (
+                    <ThemedText style={styles.checkmark}>✓</ThemedText>
+                  )}
+                </Pressable>
+              )}
+            />
+          </ThemedView>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -813,9 +901,15 @@ const styles = StyleSheet.create({
 
   // Modals
   modalBackdrop: {
-    backgroundColor: 'rgba(0,0,0,0.40)',
+    backgroundColor: 'rgba(29,36,48,0.28)',
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  modalBackdropPressable: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalAnimatedSheet: {
+    width: '100%',
   },
   modalSheet: {
     borderTopLeftRadius: 20,
@@ -824,6 +918,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     gap: Spacing.three,
+  },
+  eventPickerSheet: {
+    maxHeight: '78%',
+  },
+  modalDragArea: {
+    alignItems: 'center',
+    marginHorizontal: -Spacing.three,
+    marginTop: -Spacing.two,
+    paddingBottom: Spacing.two,
+    paddingTop: Spacing.two,
   },
   modalHandle: {
     alignSelf: 'center',
@@ -862,6 +966,9 @@ const styles = StyleSheet.create({
   },
   eventList: {
     flexGrow: 0,
+  },
+  eventListContent: {
+    paddingBottom: Spacing.four,
   },
   eventRow: {
     alignItems: 'center',

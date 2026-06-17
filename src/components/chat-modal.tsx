@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -9,14 +9,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Message, getMessages, sendMessage } from '@/lib/messages';
-import { Listing, NATIONS } from '@/lib/tickets';
+import { Listing, NATIONS, formatTicketQuantity } from '@/lib/tickets';
 
 type Props = {
   listing: Listing | null;
@@ -28,6 +28,7 @@ export function ChatModal({ listing, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -40,6 +41,28 @@ export function ChatModal({ listing, onClose }: Props) {
     setMessages([...getMessages(listing.id)]);
   }, [listing?.id]);
 
+  const scrollToBottom = useCallback(() => {
+    listRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+      setTimeout(scrollToBottom, 50);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [scrollToBottom]);
+
   const handleSend = useCallback(() => {
     if (!listing || !draft.trim()) return;
     sendMessage(listing.id, draft.trim());
@@ -48,10 +71,6 @@ export function ChatModal({ listing, onClose }: Props) {
     // refresh again after the simulated seller reply
     setTimeout(refresh, 1500);
   }, [listing, draft, refresh]);
-
-  const scrollToBottom = useCallback(() => {
-    listRef.current?.scrollToEnd({ animated: true });
-  }, []);
 
   if (!listing) return null;
 
@@ -66,7 +85,14 @@ export function ChatModal({ listing, onClose }: Props) {
       statusBarTranslucent>
       <ThemedView style={styles.screen}>
         {/* Header */}
-        <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              borderBottomColor: theme.backgroundSelected,
+              paddingTop: insets.top + Spacing.one,
+            },
+          ]}>
           <Pressable onPress={onClose} style={styles.backButton} hitSlop={8}>
             <ThemedText style={styles.backIcon}>‹</ThemedText>
           </Pressable>
@@ -75,26 +101,23 @@ export function ChatModal({ listing, onClose }: Props) {
               {listing.eventName}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {sellerName} · {listing.quantity} st
+              {sellerName} · {formatTicketQuantity(listing.quantity)} st
             </ThemedText>
           </View>
           <View style={styles.headerRight}>
             <View style={styles.onlineDot} />
           </View>
-        </SafeAreaView>
+        </View>
 
         {/* Messages */}
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}>
+        <View style={styles.flex}>
           <FlatList
             ref={listRef}
             data={messages}
             keyExtractor={(m) => m.id}
             contentContainerStyle={[
               styles.messageList,
-              { paddingBottom: insets.bottom + 80 },
+              { paddingBottom: keyboardHeight + insets.bottom + 96 },
             ]}
             onContentSizeChange={scrollToBottom}
             renderItem={({ item, index }) => (
@@ -115,7 +138,8 @@ export function ChatModal({ listing, onClose }: Props) {
               {
                 backgroundColor: theme.backgroundElement,
                 borderTopColor: theme.backgroundSelected,
-                paddingBottom: insets.bottom + Spacing.two,
+                bottom: keyboardHeight,
+                paddingBottom: keyboardHeight > 0 ? Spacing.two : insets.bottom + Spacing.two,
               },
             ]}>
             <TextInput
@@ -124,6 +148,7 @@ export function ChatModal({ listing, onClose }: Props) {
               placeholder="Skriv ett meddelande..."
               placeholderTextColor={theme.textSecondary}
               multiline
+              submitBehavior="submit"
               style={[
                 styles.input,
                 {
@@ -134,7 +159,6 @@ export function ChatModal({ listing, onClose }: Props) {
               ]}
               onSubmitEditing={handleSend}
               returnKeyType="send"
-              blurOnSubmit={false}
             />
             <Pressable
               onPress={handleSend}
@@ -145,7 +169,7 @@ export function ChatModal({ listing, onClose }: Props) {
               <ThemedText style={styles.sendIcon}>↑</ThemedText>
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </ThemedView>
     </Modal>
   );

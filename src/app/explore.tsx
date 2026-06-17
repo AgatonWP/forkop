@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NationEmblem } from '@/components/nation-emblem';
@@ -9,16 +9,14 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
-import { Listing, NATIONS, mockListings } from '@/lib/tickets';
-
-const activeListings = mockListings.slice(0, 3);
-const soldListings: Listing[] = [
-  {
-    ...mockListings[4],
-    id: 'sold-1',
-    isSold: true,
-  },
-];
+import {
+  Listing,
+  NATIONS,
+  deleteListing,
+  fetchMyListings,
+  formatTicketQuantity,
+  markListingSold,
+} from '@/lib/tickets';
 
 export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
@@ -29,6 +27,44 @@ export default function ProfileScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [listingsError, setListingsError] = useState<string | null>(null);
+  const [pendingListingId, setPendingListingId] = useState<string | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<Listing | null>(null);
+
+  const loadListings = useCallback(async () => {
+    if (!user) {
+      setListings([]);
+      return;
+    }
+
+    setListingsLoading(true);
+    setListingsError(null);
+
+    try {
+      setListings(await fetchMyListings(user.id));
+    } catch (error) {
+      setListingsError(error instanceof Error ? error.message : 'Kunde inte hämta annonser.');
+    } finally {
+      setListingsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!initializing && user) {
+      loadListings();
+    } else if (!user) {
+      setListings([]);
+      setListingsLoading(false);
+      setListingsError(null);
+      setDeleteCandidate(null);
+      setPendingListingId(null);
+    }
+  }, [initializing, loadListings, user]);
+
+  const activeListings = useMemo(() => listings.filter((listing) => !listing.isSold), [listings]);
+  const soldListings = useMemo(() => listings.filter((listing) => listing.isSold), [listings]);
 
   async function handleAuthSubmit() {
     if (!email.trim() || !password) return;
@@ -60,6 +96,42 @@ export default function ProfileScreen() {
       setAuthError(error instanceof Error ? error.message : 'Kunde inte logga ut.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleMarkSold(listing: Listing) {
+    if (!user || pendingListingId) return;
+
+    setPendingListingId(listing.id);
+    setListingsError(null);
+
+    try {
+      await markListingSold(listing.id, user.id);
+      setListings((current) =>
+        current.map((item) => (item.id === listing.id ? { ...item, isSold: true } : item)),
+      );
+    } catch (error) {
+      setListingsError(error instanceof Error ? error.message : 'Kunde inte markera annonsen som såld.');
+    } finally {
+      setPendingListingId(null);
+    }
+  }
+
+  async function handleDeleteListing() {
+    if (!user || !deleteCandidate || pendingListingId) return;
+
+    const listingId = deleteCandidate.id;
+    setPendingListingId(listingId);
+    setListingsError(null);
+
+    try {
+      await deleteListing(listingId, user.id);
+      setListings((current) => current.filter((item) => item.id !== listingId));
+      setDeleteCandidate(null);
+    } catch (error) {
+      setListingsError(error instanceof Error ? error.message : 'Kunde inte ta bort annonsen.');
+    } finally {
+      setPendingListingId(null);
     }
   }
 
@@ -112,16 +184,42 @@ export default function ProfileScreen() {
               </View>
 
               <ProfileSection title="Aktiva annonser" count={activeListings.length}>
-                {activeListings.map((listing) => (
-                  <ListingRow key={listing.id} listing={listing} />
-                ))}
+                {listingsLoading ? (
+                  <SectionNotice text="Hämtar annonser..." loading />
+                ) : activeListings.length > 0 ? (
+                  activeListings.map((listing) => (
+                    <ListingRow
+                      key={listing.id}
+                      listing={listing}
+                      pending={pendingListingId === listing.id}
+                      onDelete={() => setDeleteCandidate(listing)}
+                      onMarkSold={() => handleMarkSold(listing)}
+                    />
+                  ))
+                ) : (
+                  <SectionNotice text="Du har inga aktiva annonser." />
+                )}
               </ProfileSection>
 
               <ProfileSection title="Sålda annonser" count={soldListings.length}>
-                {soldListings.map((listing) => (
-                  <ListingRow key={listing.id} listing={listing} sold />
-                ))}
+                {listingsLoading ? (
+                  <SectionNotice text="Hämtar annonser..." loading />
+                ) : soldListings.length > 0 ? (
+                  soldListings.map((listing) => (
+                    <ListingRow
+                      key={listing.id}
+                      listing={listing}
+                      pending={pendingListingId === listing.id}
+                      sold
+                      onDelete={() => setDeleteCandidate(listing)}
+                    />
+                  ))
+                ) : (
+                  <SectionNotice text="Du har inga sålda annonser." />
+                )}
               </ProfileSection>
+
+              {listingsError && <ThemedText style={styles.errorText}>{listingsError}</ThemedText>}
             </>
           ) : (
             <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
@@ -187,6 +285,13 @@ export default function ProfileScreen() {
           )}
         </View>
       </ScrollView>
+
+      <ConfirmDeleteModal
+        listing={deleteCandidate}
+        pending={pendingListingId === deleteCandidate?.id}
+        onCancel={() => setDeleteCandidate(null)}
+        onConfirm={handleDeleteListing}
+      />
     </ThemedView>
   );
 }
@@ -210,7 +315,32 @@ function ProfileSection({
   );
 }
 
-function ListingRow({ listing, sold = false }: { listing: Listing; sold?: boolean }) {
+function SectionNotice({ text, loading = false }: { text: string; loading?: boolean }) {
+  const theme = useTheme();
+
+  return (
+    <View style={[styles.noticeRow, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+      {loading && <ActivityIndicator size="small" color={theme.textSecondary} />}
+      <ThemedText type="small" themeColor="textSecondary">
+        {text}
+      </ThemedText>
+    </View>
+  );
+}
+
+function ListingRow({
+  listing,
+  sold = false,
+  pending = false,
+  onDelete,
+  onMarkSold,
+}: {
+  listing: Listing;
+  sold?: boolean;
+  pending?: boolean;
+  onDelete: () => void;
+  onMarkSold?: () => void;
+}) {
   const theme = useTheme();
   const nationName = NATIONS[listing.nationId] ?? listing.nationId;
   const showTradeBadge = listing.dealType === 'trade' || listing.dealType === 'both';
@@ -232,7 +362,7 @@ function ListingRow({ listing, sold = false }: { listing: Listing; sold?: boolea
           {listing.eventName}
         </ThemedText>
         <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-          {nationName} · {listing.quantity} st
+          {nationName} · {formatTicketQuantity(listing.quantity)} st
         </ThemedText>
       </View>
 
@@ -243,20 +373,84 @@ function ListingRow({ listing, sold = false }: { listing: Listing; sold?: boolea
       )}
 
       {sold ? (
-        <View style={styles.soldBadge}>
-          <ThemedText style={styles.soldBadgeText}>Såld</ThemedText>
-        </View>
+        <>
+          <View style={styles.soldBadge}>
+            <ThemedText style={styles.soldBadgeText}>Såld</ThemedText>
+          </View>
+          <Pressable
+            accessibilityLabel="Ta bort annons"
+            disabled={pending}
+            onPress={onDelete}
+            style={[styles.iconButton, styles.deleteButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
+            <ThemedText style={styles.deleteButtonText}>×</ThemedText>
+          </Pressable>
+        </>
       ) : (
         <View style={styles.actionGroup}>
-          <Pressable style={[styles.iconButton, { borderColor: theme.backgroundSelected }]}>
+          <Pressable
+            accessibilityLabel="Markera annons som såld"
+            disabled={pending}
+            onPress={onMarkSold}
+            style={[styles.iconButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
             <ThemedText style={styles.iconButtonText}>✓</ThemedText>
           </Pressable>
-          <Pressable style={[styles.iconButton, styles.deleteButton, { borderColor: theme.backgroundSelected }]}>
+          <Pressable
+            accessibilityLabel="Ta bort annons"
+            disabled={pending}
+            onPress={onDelete}
+            style={[styles.iconButton, styles.deleteButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
             <ThemedText style={styles.deleteButtonText}>×</ThemedText>
           </Pressable>
         </View>
       )}
     </View>
+  );
+}
+
+function ConfirmDeleteModal({
+  listing,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  listing: Listing | null;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Modal
+      visible={!!listing}
+      animationType="fade"
+      transparent
+      onRequestClose={onCancel}>
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.confirmCard, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+          <ThemedText style={styles.confirmTitle}>Ta bort annons?</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.confirmCopy}>
+            {listing ? `${listing.eventName} tas bort permanent.` : ''}
+          </ThemedText>
+          <View style={styles.confirmActions}>
+            <Pressable
+              disabled={pending}
+              onPress={onCancel}
+              style={[styles.confirmButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
+              <ThemedText style={styles.cancelButtonText}>Avbryt</ThemedText>
+            </Pressable>
+            <Pressable
+              disabled={pending}
+              onPress={onConfirm}
+              style={[styles.confirmButton, styles.confirmDeleteButton, { opacity: pending ? 0.5 : 1 }]}>
+              <ThemedText style={styles.confirmDeleteText}>
+                {pending ? 'Tar bort...' : 'Ta bort'}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -408,6 +602,15 @@ const styles = StyleSheet.create({
   sectionRows: {
     gap: Spacing.two,
   },
+  noticeRow: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: Spacing.two,
+    minHeight: 48,
+    paddingHorizontal: Spacing.three,
+  },
   listingRow: {
     alignItems: 'center',
     borderRadius: 8,
@@ -475,5 +678,56 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     lineHeight: 20,
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: '#1D243080',
+    flex: 1,
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
+  confirmCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: Spacing.three,
+    maxWidth: 360,
+    padding: Spacing.four,
+    width: '100%',
+  },
+  confirmTitle: {
+    color: '#1D2430',
+    fontSize: 19,
+    fontWeight: '800',
+    lineHeight: 24,
+  },
+  confirmCopy: {
+    lineHeight: 19,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    justifyContent: 'flex-end',
+  },
+  confirmButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: Spacing.three,
+  },
+  cancelButtonText: {
+    color: '#1D2430',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  confirmDeleteButton: {
+    backgroundColor: '#C84646',
+    borderColor: '#C84646',
+  },
+  confirmDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

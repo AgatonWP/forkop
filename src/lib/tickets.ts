@@ -21,6 +21,9 @@ export type Listing = {
   sellerName?: string;
 };
 
+export const MAX_EXACT_TICKET_QUANTITY = 20;
+export const MORE_THAN_MAX_TICKET_QUANTITY = MAX_EXACT_TICKET_QUANTITY + 1;
+
 export const EVENT_CATEGORIES: { id: EventCategory; label: string; keywords: string[] }[] = [
   { id: 'all', label: 'Alla', keywords: [] },
   {
@@ -99,6 +102,12 @@ export function formatRelativeTime(date: Date) {
   return `${days} d sedan`;
 }
 
+export function formatTicketQuantity(quantity: number) {
+  return quantity >= MORE_THAN_MAX_TICKET_QUANTITY
+    ? `${MAX_EXACT_TICKET_QUANTITY}+`
+    : String(quantity);
+}
+
 type ListingRow = {
   id: string;
   event_name: string;
@@ -147,6 +156,47 @@ export async function fetchActiveListings(): Promise<Listing[]> {
   }
 
   return (data ?? []).map((row) => mapListing(row as ListingRow));
+}
+
+export async function fetchMyListings(userId: string): Promise<Listing[]> {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(
+      'id,event_name,ticket_type,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,nation_id,status',
+    )
+    .eq('user_id', userId)
+    .in('status', ['active', 'sold'])
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => mapListing(row as ListingRow));
+}
+
+export async function markListingSold(listingId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('listings')
+    .update({ status: 'sold' })
+    .eq('id', listingId)
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteListing(listingId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('listings')
+    .update({ status: 'archived' })
+    .eq('id', listingId)
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export const mockListings: Listing[] = [
