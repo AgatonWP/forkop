@@ -18,6 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 
 import { ChatModal } from '@/components/chat-modal';
+import { Logo } from '@/components/logo';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -100,11 +101,7 @@ export default function HomeScreen() {
         <View style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
           <View style={styles.headerRow}>
             <View style={styles.logoBlock}>
-              <Image
-                source={require('@/assets/images/tixet-logo.png')}
-                resizeMode="contain"
-                style={styles.logoImage}
-              />
+              <Logo />
             </View>
             <Pressable
               style={({ pressed }) => [
