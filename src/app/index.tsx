@@ -93,11 +93,20 @@ export default function HomeScreen() {
       })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [category, dealFilter, listings, search]);
+  const compactHeaderTop = Math.max(insets.top - 12, 8);
 
   return (
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
+      <SafeAreaView style={styles.safeArea} edges={[]}>
+        <View
+          style={[
+            styles.header,
+            {
+              borderBottomColor: theme.backgroundSelected,
+              backgroundColor: theme.backgroundHeader,
+              paddingTop: compactHeaderTop,
+            },
+          ]}>
           <View style={styles.headerRow}>
             <View style={styles.logoBlock}>
               <Image
@@ -486,25 +495,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
+    paddingBottom: 8,
+    paddingTop: 6,
   },
   logoBlock: {
-    height: 40,
+    height: 36,
     justifyContent: 'center',
-    width: 108,
+    width: 98,
   },
   logoImage: {
-    height: 40,
-    width: 108,
+    height: 36,
+    width: 98,
   },
   createButton: {
     backgroundColor: '#1D2430',
     borderColor: 'rgba(255,255,255,0.16)',
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 38,
+    minHeight: 34,
     justifyContent: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     shadowColor: '#1D2430',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,

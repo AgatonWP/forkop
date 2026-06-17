@@ -15,7 +15,6 @@ import {
   deleteListing,
   fetchMyListings,
   formatTicketQuantity,
-  markListingSold,
 } from '@/lib/tickets';
 
 export default function ProfileScreen() {
@@ -99,24 +98,6 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleMarkSold(listing: Listing) {
-    if (!user || pendingListingId) return;
-
-    setPendingListingId(listing.id);
-    setListingsError(null);
-
-    try {
-      await markListingSold(listing.id, user.id);
-      setListings((current) =>
-        current.map((item) => (item.id === listing.id ? { ...item, isSold: true } : item)),
-      );
-    } catch (error) {
-      setListingsError(error instanceof Error ? error.message : 'Kunde inte markera annonsen som såld.');
-    } finally {
-      setPendingListingId(null);
-    }
-  }
-
   async function handleDeleteListing() {
     if (!user || !deleteCandidate || pendingListingId) return;
 
@@ -193,7 +174,6 @@ export default function ProfileScreen() {
                       listing={listing}
                       pending={pendingListingId === listing.id}
                       onDelete={() => setDeleteCandidate(listing)}
-                      onMarkSold={() => handleMarkSold(listing)}
                     />
                   ))
                 ) : (
@@ -333,13 +313,11 @@ function ListingRow({
   sold = false,
   pending = false,
   onDelete,
-  onMarkSold,
 }: {
   listing: Listing;
   sold?: boolean;
   pending?: boolean;
   onDelete: () => void;
-  onMarkSold?: () => void;
 }) {
   const theme = useTheme();
   const nationName = NATIONS[listing.nationId] ?? listing.nationId;
@@ -387,13 +365,6 @@ function ListingRow({
         </>
       ) : (
         <View style={styles.actionGroup}>
-          <Pressable
-            accessibilityLabel="Markera annons som såld"
-            disabled={pending}
-            onPress={onMarkSold}
-            style={[styles.iconButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
-            <ThemedText style={styles.iconButtonText}>✓</ThemedText>
-          </Pressable>
           <Pressable
             accessibilityLabel="Ta bort annons"
             disabled={pending}
@@ -663,12 +634,6 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     width: 32,
-  },
-  iconButtonText: {
-    color: '#1D2430',
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 18,
   },
   deleteButton: {
     backgroundColor: '#FFF7F7',

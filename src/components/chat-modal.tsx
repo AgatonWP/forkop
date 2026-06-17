@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
   FlatList,
   Keyboard,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -12,7 +15,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Message, getMessages, sendMessage } from '@/lib/messages';
@@ -30,11 +32,13 @@ export function ChatModal({ listing, onClose }: Props) {
   const [draft, setDraft] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const listRef = useRef<FlatList>(null);
+  const screenTranslateX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!listing) return;
     setMessages([...getMessages(listing.id)]);
-  }, [listing?.id]);
+    screenTranslateX.setValue(0);
+  }, [listing?.id, screenTranslateX]);
 
   const refresh = useCallback(() => {
     if (!listing) return;
@@ -72,6 +76,48 @@ export function ChatModal({ listing, onClose }: Props) {
     setTimeout(refresh, 1500);
   }, [listing, draft, refresh]);
 
+  const closeFromSwipe = useCallback(() => {
+    Animated.timing(screenTranslateX, {
+      toValue: Dimensions.get('window').width,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      screenTranslateX.setValue(0);
+      onClose();
+    });
+  }, [onClose, screenTranslateX]);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          gesture.dx > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4,
+        onPanResponderMove: (_, gesture) => {
+          screenTranslateX.setValue(Math.max(0, gesture.dx));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dx > 100 || gesture.vx > 1.1) {
+            closeFromSwipe();
+            return;
+          }
+
+          Animated.spring(screenTranslateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(screenTranslateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start();
+        },
+      }),
+    [closeFromSwipe, screenTranslateX],
+  );
+
   if (!listing) return null;
 
   const nationName = NATIONS[listing.nationId] ?? listing.nationId;
@@ -83,7 +129,15 @@ export function ChatModal({ listing, onClose }: Props) {
       visible={!!listing}
       onRequestClose={onClose}
       statusBarTranslucent>
-      <ThemedView style={styles.screen}>
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.screen,
+          {
+            backgroundColor: theme.background,
+            transform: [{ translateX: screenTranslateX }],
+          },
+        ]}>
         {/* Header */}
         <View
           style={[
@@ -170,7 +224,7 @@ export function ChatModal({ listing, onClose }: Props) {
             </Pressable>
           </View>
         </View>
-      </ThemedView>
+      </Animated.View>
     </Modal>
   );
 }

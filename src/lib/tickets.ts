@@ -175,22 +175,10 @@ export async function fetchMyListings(userId: string): Promise<Listing[]> {
   return (data ?? []).map((row) => mapListing(row as ListingRow));
 }
 
-export async function markListingSold(listingId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('listings')
-    .update({ status: 'sold' })
-    .eq('id', listingId)
-    .eq('user_id', userId);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-}
-
 export async function deleteListing(listingId: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from('listings')
-    .update({ status: 'archived' })
+    .delete()
     .eq('id', listingId)
     .eq('user_id', userId);
 
