@@ -8,6 +8,7 @@ import {
 } from 'expo-router/ui';
 import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
 
+import { Logo } from './logo';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -67,9 +68,9 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          Tixet
-        </ThemedText>
+        <View style={styles.brandText}>
+          <Logo />
+        </View>
 
         {props.children}
       </ThemedView>

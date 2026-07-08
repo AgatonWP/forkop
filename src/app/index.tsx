@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 
 import { ChatModal } from '@/components/chat-modal';
+import { Logo } from '@/components/logo';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -124,7 +125,7 @@ export default function HomeScreen() {
           ]}>
           <View style={styles.headerRow}>
             <View style={styles.brandBlock}>
-              <ThemedText style={styles.brandTitle}>FÖRKÖP LUND</ThemedText>
+              <Logo />
             </View>
             <Pressable
               accessibilityLabel="Lägg upp annons"
@@ -581,13 +582,6 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: 'center',
     minWidth: 150,
-  },
-  brandTitle: {
-    color: '#1D2430',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    lineHeight: 22,
   },
   createButton: {
     alignItems: 'center',
