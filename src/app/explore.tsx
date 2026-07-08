@@ -1,3 +1,5 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -148,6 +150,16 @@ export default function ProfileScreen() {
             <ThemedText style={styles.backButtonText}>‹</ThemedText>
           </Pressable>
           <ThemedText style={styles.headerTitle}>Profil</ThemedText>
+          {user ? (
+            <Pressable
+              accessibilityLabel="Inställningar"
+              onPress={() => router.push('/settings')}
+              style={styles.settingsButton}>
+              <Ionicons color="#1D2430" name="settings-outline" size={22} />
+            </Pressable>
+          ) : (
+            <View style={styles.settingsButton} />
+          )}
         </View>
       </SafeAreaView>
 
@@ -167,11 +179,19 @@ export default function ProfileScreen() {
           ) : user ? (
             <>
               <View style={styles.profileRow}>
-                <View style={styles.avatar}>
-                  <ThemedText style={styles.avatarText}>
-                    {(user.email?.[0] ?? 'T').toUpperCase()}
-                  </ThemedText>
-                </View>
+                {user.user_metadata?.avatar_url ? (
+                  <Image
+                    contentFit="cover"
+                    source={{ uri: user.user_metadata.avatar_url }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={styles.avatar}>
+                    <ThemedText style={styles.avatarText}>
+                      {(user.email?.[0] ?? 'T').toUpperCase()}
+                    </ThemedText>
+                  </View>
+                )}
                 <View style={styles.profileCopy}>
                   <ThemedText numberOfLines={1} style={styles.profileName}>
                     {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Tixet'}
@@ -492,9 +512,17 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#1D2430',
+    flex: 1,
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
+  },
+  settingsButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
   },
   scrollView: {
     flex: 1,
