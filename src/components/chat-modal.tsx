@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
@@ -17,36 +18,86 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { Message, getMessages, sendMessage } from '@/lib/messages';
+import { useAuth } from '@/lib/auth';
+import {
+  Conversation,
+  Message,
+  fetchConversation,
+  fetchMessages,
+  getOrCreateConversation,
+  sendMessage,
+  subscribeToMessages,
+} from '@/lib/messages';
 import { getNation } from '@/lib/nations';
 import { Listing, formatTicketQuantity } from '@/lib/tickets';
 import { ReportModal } from '@/components/report-modal';
 
 type Props = {
   listing: Listing | null;
+  /** When opened from an inbox (e.g. as the seller), pass the known conversation id to skip creation. */
+  conversationId?: string;
   onClose: () => void;
 };
 
-export function ChatModal({ listing, onClose }: Props) {
+export function ChatModal({ listing, conversationId, onClose }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
   const screenTranslateX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!listing) return;
-    setMessages([...getMessages(listing.id)]);
     screenTranslateX.setValue(0);
   }, [listing?.id, screenTranslateX]);
 
-  const refresh = useCallback(() => {
-    if (!listing) return;
-    setMessages([...getMessages(listing.id)]);
-  }, [listing?.id]);
+  useEffect(() => {
+    if (!listing || !user) return;
+
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+    setConversation(null);
+    setMessages([]);
+
+    const load = conversationId ? fetchConversation(conversationId) : getOrCreateConversation(listing.id, user.id);
+
+    load
+      .then(async (conv) => {
+        if (!active) return;
+        setConversation(conv);
+        const msgs = await fetchMessages(conv.id, user.id);
+        if (!active) return;
+        setMessages(msgs);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLoadError(error instanceof Error ? error.message : 'Kunde inte ladda chatten.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [listing?.id, conversationId, user?.id]);
+
+  useEffect(() => {
+    if (!conversation || !user) return;
+
+    return subscribeToMessages(conversation.id, user.id, (message) => {
+      setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
+    });
+  }, [conversation?.id, user?.id]);
 
   const scrollToBottom = useCallback(() => {
     listRef.current?.scrollToEnd({ animated: true });
@@ -70,14 +121,23 @@ export function ChatModal({ listing, onClose }: Props) {
     };
   }, [scrollToBottom]);
 
-  const handleSend = useCallback(() => {
-    if (!listing || !draft.trim()) return;
-    sendMessage(listing.id, draft.trim());
-    setDraft('');
-    setMessages([...getMessages(listing.id)]);
-    // refresh again after the simulated seller reply
-    setTimeout(refresh, 1500);
-  }, [listing, draft, refresh]);
+  const handleSend = useCallback(async () => {
+    if (!conversation || !user || !draft.trim() || sending) return;
+
+    const text = draft.trim();
+    setSending(true);
+    setSendError(null);
+
+    try {
+      const message = await sendMessage(conversation.id, user.id, text);
+      setDraft('');
+      setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Kunde inte skicka meddelandet.');
+    } finally {
+      setSending(false);
+    }
+  }, [conversation, user, draft, sending]);
 
   const closeFromSwipe = useCallback(() => {
     Animated.timing(screenTranslateX, {
@@ -124,7 +184,8 @@ export function ChatModal({ listing, onClose }: Props) {
   if (!listing) return null;
 
   const nationName = getNation(listing.nationId).name;
-  const sellerName = listing.sellerName ?? nationName;
+  const isSeller = !!user && listing.userId === user.id;
+  const subtitle = isSeller ? 'Köpare' : nationName;
 
   return (
     <Modal
@@ -158,11 +219,10 @@ export function ChatModal({ listing, onClose }: Props) {
               {listing.eventName}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {sellerName} · {formatTicketQuantity(listing.quantity)} st
+              {subtitle} · {formatTicketQuantity(listing.quantity)} st
             </ThemedText>
           </View>
           <View style={styles.headerRight}>
-            <View style={styles.onlineDot} />
             <Pressable
               accessibilityLabel="Rapportera"
               hitSlop={8}
@@ -175,64 +235,98 @@ export function ChatModal({ listing, onClose }: Props) {
 
         {/* Messages */}
         <View style={styles.flex}>
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(m) => m.id}
-            contentContainerStyle={[
-              styles.messageList,
-              { paddingBottom: keyboardHeight + insets.bottom + 96 },
-            ]}
-            onContentSizeChange={scrollToBottom}
-            renderItem={({ item, index }) => (
-              <MessageBubble
-                message={item}
-                showDate={
-                  index === 0 ||
-                  messages[index - 1].sentAt.getMinutes() !== item.sentAt.getMinutes()
-                }
-              />
-            )}
-          />
+          {!user ? (
+            <View style={styles.centerNotice}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Logga in för att chatta.
+              </ThemedText>
+            </View>
+          ) : loading ? (
+            <View style={styles.centerNotice}>
+              <ActivityIndicator size="small" color={theme.textSecondary} />
+            </View>
+          ) : loadError ? (
+            <View style={styles.centerNotice}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {loadError}
+              </ThemedText>
+            </View>
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(m) => m.id}
+              contentContainerStyle={[
+                styles.messageList,
+                { paddingBottom: keyboardHeight + insets.bottom + 96 },
+              ]}
+              onContentSizeChange={scrollToBottom}
+              renderItem={({ item, index }) => (
+                <MessageBubble
+                  message={item}
+                  showDate={
+                    index === 0 ||
+                    messages[index - 1].sentAt.getMinutes() !== item.sentAt.getMinutes()
+                  }
+                />
+              )}
+              ListEmptyComponent={
+                <View style={styles.centerNotice}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Inga meddelanden än. Säg hej!
+                  </ThemedText>
+                </View>
+              }
+            />
+          )}
 
           {/* Input bar */}
-          <View
-            style={[
-              styles.inputBar,
-              {
-                backgroundColor: theme.backgroundElement,
-                borderTopColor: theme.backgroundSelected,
-                bottom: keyboardHeight,
-                paddingBottom: keyboardHeight > 0 ? Spacing.two : insets.bottom + Spacing.two,
-              },
-            ]}>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Skriv ett meddelande..."
-              placeholderTextColor={theme.textSecondary}
-              multiline
-              submitBehavior="submit"
+          {user && !loading && !loadError && (
+            <View
               style={[
-                styles.input,
+                styles.inputBar,
                 {
-                  backgroundColor: theme.background,
-                  borderColor: theme.backgroundSelected,
-                  color: theme.text,
+                  backgroundColor: theme.backgroundElement,
+                  borderTopColor: theme.backgroundSelected,
+                  bottom: keyboardHeight,
+                  paddingBottom: keyboardHeight > 0 ? Spacing.two : insets.bottom + Spacing.two,
                 },
-              ]}
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-            />
-            <Pressable
-              onPress={handleSend}
-              style={[
-                styles.sendButton,
-                { opacity: draft.trim() ? 1 : 0.3 },
               ]}>
-              <ThemedText style={styles.sendIcon}>↑</ThemedText>
-            </Pressable>
-          </View>
+              <View style={styles.inputRow}>
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder="Skriv ett meddelande..."
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  submitBehavior="submit"
+                  editable={!sending}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.background,
+                      borderColor: theme.backgroundSelected,
+                      color: theme.text,
+                    },
+                  ]}
+                  onSubmitEditing={handleSend}
+                  returnKeyType="send"
+                />
+                <Pressable
+                  onPress={handleSend}
+                  disabled={sending}
+                  style={[
+                    styles.sendButton,
+                    { opacity: draft.trim() && !sending ? 1 : 0.3 },
+                  ]}>
+                  <ThemedText style={styles.sendIcon}>↑</ThemedText>
+                </Pressable>
+              </View>
+              {sendError && (
+                <ThemedText style={styles.sendErrorText}>{sendError}</ThemedText>
+              )}
+            </View>
+          )}
         </View>
       </Animated.View>
 
@@ -322,12 +416,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     justifyContent: 'flex-end',
   },
-  onlineDot: {
-    backgroundColor: '#34C759',
-    borderRadius: 5,
-    height: 10,
-    width: 10,
-  },
   moreButton: {
     alignItems: 'center',
     height: 28,
@@ -341,7 +429,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  centerNotice: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.five,
+  },
+
   messageList: {
+    flexGrow: 1,
     gap: Spacing.one,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
@@ -385,16 +481,19 @@ const styles = StyleSheet.create({
   },
 
   inputBar: {
-    alignItems: 'flex-end',
     borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: Spacing.two,
+    gap: Spacing.one,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  inputRow: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: Spacing.two,
   },
   input: {
     borderRadius: 22,
@@ -419,5 +518,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     lineHeight: 24,
+  },
+  sendErrorText: {
+    color: '#C84646',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: Spacing.one,
   },
 });

@@ -9,7 +9,6 @@ import {
   Pressable,
   RefreshControl,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
@@ -22,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/lib/auth';
 import { getNation } from '@/lib/nations';
 import { ReportModal } from '@/components/report-modal';
 import {
@@ -353,12 +353,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         <View style={styles.cardTitleBlock}>
           <View style={styles.titleRow}>
             <ThemedText numberOfLines={1} style={styles.cardTitle}>
-              {listing.eventName.includes(' – ') ? (
-                <>
-                  {listing.eventName.slice(0, listing.eventName.indexOf(' – '))}
-                  <Text style={styles.cardTitleSub}>{' · ' + listing.eventName.slice(listing.eventName.indexOf(' – ') + 3)}</Text>
-                </>
-              ) : listing.eventName}
+              {listing.ticketType}
             </ThemedText>
             <View style={styles.quantityPill}>
               <ThemedText style={styles.quantityText}>
@@ -410,13 +405,11 @@ function ListingModal({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const nationName = listing ? getNation(listing.nationId).name : '';
-  const titleText = listing
-    ? listing.eventName.includes(' – ')
-      ? listing.eventName.slice(listing.eventName.indexOf(' – ') + 3)
-      : listing.eventName
-    : '';
+  const titleText = listing ? listing.ticketType : '';
+  const isOwnListing = !!user && !!listing && listing.userId === user.id;
 
   useEffect(() => {
     sheetTranslateY.setValue(0);
@@ -505,7 +498,6 @@ function ListingModal({
 
                 <View style={styles.modalStats}>
                   <Stat label="Antal" value={`${formatTicketQuantity(listing.quantity)} st`} />
-                  <Stat label="Typ" value={listing.ticketType} />
                   {(listing.dealType === 'sell' || listing.dealType === 'both') && listing.price && (
                     <Stat label="Pris" value={`${listing.price} kr/st`} />
                   )}
@@ -522,15 +514,23 @@ function ListingModal({
                   </>
                 )}
 
-                <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
-                  <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
-                </Pressable>
-
-                <Pressable style={styles.reportLink} onPress={() => onReport(listing)}>
-                  <ThemedText type="small" style={styles.reportLinkText}>
-                    🚩 Rapportera annons
+                {isOwnListing ? (
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.ownListingNote}>
+                    Det här är din egen annons. Hantera den under Profil.
                   </ThemedText>
-                </Pressable>
+                ) : (
+                  <>
+                    <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
+                      <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
+                    </Pressable>
+
+                    <Pressable style={styles.reportLink} onPress={() => onReport(listing)}>
+                      <ThemedText type="small" style={styles.reportLinkText}>
+                        🚩 Rapportera annons
+                      </ThemedText>
+                    </Pressable>
+                  </>
+                )}
               </>
             )}
           </ThemedView>
@@ -732,13 +732,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
   },
-  cardTitleSub: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#687283',
-    textTransform: 'none',
-    letterSpacing: 0,
-  },
   cardTitleBlock: {
     flex: 1,
     gap: 2,
@@ -901,5 +894,8 @@ const styles = StyleSheet.create({
   reportLinkText: {
     color: '#A15353',
     fontWeight: '700',
+  },
+  ownListingNote: {
+    textAlign: 'center',
   },
 });

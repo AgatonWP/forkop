@@ -25,6 +25,9 @@ export default function AppTabs() {
           <TabTrigger name="sell" href="/sell" asChild>
             <SellTabButton>+ Lägg upp</SellTabButton>
           </TabTrigger>
+          <TabTrigger name="messages" href="/messages" asChild>
+            <TabButton>Meddelanden</TabButton>
+          </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>Profil</TabButton>
           </TabTrigger>

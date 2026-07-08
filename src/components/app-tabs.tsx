@@ -26,6 +26,13 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="messages">
+        <Label>Meddelanden</Label>
+        <Icon
+          src={require('@/assets/images/tabIcons/explore.png')}
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="explore">
         <Label>Profil</Label>
         <Icon

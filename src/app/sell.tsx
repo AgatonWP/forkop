@@ -168,7 +168,7 @@ export default function SellScreen() {
               )}
 
               {/* 1. Nation / arrangör */}
-              <FormSection label="1. Nation / arrangör">
+              <FormSection label="Nation / arrangör">
                 <Pressable
                   onPress={() => setNationPickerOpen(true)}
                   style={[
@@ -209,7 +209,7 @@ export default function SellScreen() {
               </FormSection>
 
               {/* 2. Ticket type */}
-              <FormSection label="2. Biljettyp">
+              <FormSection label="Biljettyp">
                 <Pressable
                   onPress={() => setTicketTypePickerOpen(true)}
                   style={[
@@ -227,7 +227,7 @@ export default function SellScreen() {
               </FormSection>
 
               {/* 3. Quantity */}
-              <FormSection label="3. Antal biljetter">
+              <FormSection label="Antal biljetter">
                 <View style={styles.stepper}>
                   <Pressable
                     onPress={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -248,7 +248,7 @@ export default function SellScreen() {
               </FormSection>
 
               {/* 4. Deal type */}
-              <FormSection label="4. Jag vill...">
+              <FormSection label="Jag vill...">
                 <View style={styles.segment}>
                   <SegmentButton
                     label="Sälja"
@@ -270,7 +270,7 @@ export default function SellScreen() {
 
               {/* 5. Price — shown when selling */}
               {(dealType === 'sell' || dealType === 'both') && (
-                <FormSection label="5. Pris per biljett">
+                <FormSection label="Pris per biljett">
                   <View style={styles.priceRow}>
                     <TextInput
                       value={price}
@@ -294,7 +294,7 @@ export default function SellScreen() {
 
               {/* 5. Trade want — shown when trading */}
               {(dealType === 'trade' || dealType === 'both') && (
-                <FormSection label="5. Vill byta mot">
+                <FormSection label="Vill byta mot">
                   <TextInput
                     value={tradeWant}
                     onChangeText={setTradeWant}
@@ -313,7 +313,7 @@ export default function SellScreen() {
               )}
 
               {/* 6. Description */}
-              <FormSection label="6. Beskrivning (valfritt)">
+              <FormSection label="Beskrivning (valfritt)">
                 <TextInput
                   value={description}
                   onChangeText={setDescription}
