@@ -3,10 +3,12 @@ import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native
 import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import { useI18n } from '@/lib/i18n';
 
 export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const { t } = useI18n();
 
   return (
     <NativeTabs
@@ -14,7 +16,7 @@ export default function AppTabs() {
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}>
       <NativeTabs.Trigger name="index">
-        <Label>Köp</Label>
+        <Label>{t('buy')}</Label>
         <Icon
           src={{
             default: <VectorIcon family={Ionicons} name="home-outline" />,
@@ -24,7 +26,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="sell">
-        <Label>Lägg upp</Label>
+        <Label>{t('sell')}</Label>
         <Icon
           src={{
             default: <VectorIcon family={Ionicons} name="add-circle-outline" />,
@@ -34,7 +36,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="messages">
-        <Label>Meddelanden</Label>
+        <Label>{t('messages')}</Label>
         <Icon
           src={{
             default: <VectorIcon family={Ionicons} name="chatbubble-outline" />,
@@ -44,7 +46,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="explore">
-        <Label>Profil</Label>
+        <Label>{t('profile')}</Label>
         <Icon
           src={{
             default: <VectorIcon family={Ionicons} name="person-circle-outline" />,
@@ -52,6 +54,8 @@ export default function AppTabs() {
           }}
         />
       </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="settings" hidden />
     </NativeTabs>
   );
 }

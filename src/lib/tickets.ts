@@ -100,7 +100,6 @@ export async function fetchMyListings(userId: string): Promise<Listing[]> {
     .from('listings')
     .select(LISTING_COLUMNS)
     .eq('user_id', userId)
-    .in('status', ['active', 'sold'])
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -126,7 +125,16 @@ export async function fetchListingsByIds(listingIds: string[]): Promise<Listing[
 }
 
 export async function markListingSold(listing: Listing, userId: string): Promise<string> {
-  await deleteListing(listing.id, userId);
+  const { error } = await supabase
+    .from('listings')
+    .update({ status: 'sold' })
+    .eq('id', listing.id)
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
   return listing.id;
 }
 

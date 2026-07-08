@@ -1,16 +1,24 @@
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
 import { AuthProvider } from '@/lib/auth';
+import { I18nProvider } from '@/lib/i18n';
 import '@/lib/notification-handler';
 
-export default function TabLayout() {
+export default function RootLayout() {
   return (
     <ThemeProvider value={DefaultTheme}>
       <AuthProvider>
-        <AnimatedSplashOverlay />
-        <AppTabs />
+        <I18nProvider>
+          <StatusBar style="dark" />
+          <AnimatedSplashOverlay />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="settings" />
+          </Stack>
+        </I18nProvider>
       </AuthProvider>
     </ThemeProvider>
   );

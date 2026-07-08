@@ -5,12 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LanguageToggle } from '@/components/language-toggle';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, SecondaryHeaderHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { getNation } from '@/lib/nations';
 import {
   Listing,
@@ -24,6 +26,7 @@ export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   const { initializing, user, signIn, signOut, signUp } = useAuth();
+  const { t } = useI18n();
   const [email, setEmail] = useState('tixet@tixet.se');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -47,11 +50,11 @@ export default function ProfileScreen() {
     try {
       setListings(await fetchMyListings(user.id));
     } catch (error) {
-      setListingsError(error instanceof Error ? error.message : 'Kunde inte hämta annonser.');
+      setListingsError(error instanceof Error ? error.message : t('listingFetchErrorSentence'));
     } finally {
       setListingsLoading(false);
     }
-  }, [user]);
+  }, [t, user]);
 
   useEffect(() => {
     if (!initializing && user) {
@@ -82,7 +85,7 @@ export default function ProfileScreen() {
       }
       setPassword('');
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Något gick fel. Försök igen.');
+      setAuthError(error instanceof Error ? error.message : t('authGenericError'));
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +98,7 @@ export default function ProfileScreen() {
     try {
       await signOut();
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Kunde inte logga ut.');
+      setAuthError(error instanceof Error ? error.message : t('signOutError'));
     } finally {
       setSubmitting(false);
     }
@@ -113,7 +116,7 @@ export default function ProfileScreen() {
       setListings((current) => current.filter((item) => item.id !== listingId));
       setDeleteCandidate(null);
     } catch (error) {
-      setListingsError(error instanceof Error ? error.message : 'Kunde inte ta bort annonsen.');
+      setListingsError(error instanceof Error ? error.message : t('deleteListingError'));
     } finally {
       setPendingListingId(null);
     }
@@ -135,7 +138,7 @@ export default function ProfileScreen() {
       );
       setDeleteCandidate(null);
     } catch (error) {
-      setListingsError(error instanceof Error ? error.message : 'Kunde inte markera annonsen som såld.');
+      setListingsError(error instanceof Error ? error.message : t('markSoldError'));
       setDeleteCandidate(null);
     } finally {
       setPendingListingId(null);
@@ -146,20 +149,22 @@ export default function ProfileScreen() {
     <ThemedView style={styles.screen}>
       <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
-          <Pressable onPress={() => router.push('/')} style={styles.backButton}>
-            <ThemedText style={styles.backButtonText}>‹</ThemedText>
-          </Pressable>
-          <ThemedText style={styles.headerTitle}>Profil</ThemedText>
-          {user ? (
-            <Pressable
-              accessibilityLabel="Inställningar"
-              onPress={() => router.push('/settings')}
-              style={styles.settingsButton}>
-              <Ionicons color="#1D2430" name="settings-outline" size={22} />
-            </Pressable>
-          ) : (
-            <View style={styles.settingsButton} />
-          )}
+          <View style={styles.headerSide} />
+          <ThemedText style={styles.headerTitle}>{t('profile')}</ThemedText>
+          <View style={styles.headerRight}>
+            <LanguageToggle />
+            {user ? (
+              <Pressable
+                accessibilityLabel="Inställningar"
+                hitSlop={16}
+                onPress={() => router.push('/settings')}
+                style={({ pressed }) => [styles.settingsButton, pressed && styles.settingsButtonPressed]}>
+                <Ionicons color="#1D2430" name="settings-outline" size={22} />
+              </Pressable>
+            ) : (
+              <View style={styles.settingsButton} />
+            )}
+          </View>
         </View>
       </SafeAreaView>
 
@@ -204,13 +209,13 @@ export default function ProfileScreen() {
                   disabled={submitting}
                   onPress={handleSignOut}
                   style={[styles.outlineButton, { borderColor: theme.backgroundSelected, opacity: submitting ? 0.6 : 1 }]}>
-                  <ThemedText style={styles.outlineButtonText}>Logga ut</ThemedText>
+                  <ThemedText style={styles.outlineButtonText}>{t('signOut')}</ThemedText>
                 </Pressable>
               </View>
 
-              <ProfileSection title="Aktiva annonser" count={activeListings.length}>
+              <ProfileSection title={t('activeListings')} count={activeListings.length}>
                 {listingsLoading ? (
-                  <SectionNotice text="Hämtar annonser..." loading />
+                  <SectionNotice text={t('loadingListings')} loading />
                 ) : activeListings.length > 0 ? (
                   activeListings.map((listing) => (
                     <ListingRow
@@ -221,13 +226,13 @@ export default function ProfileScreen() {
                     />
                   ))
                 ) : (
-                  <SectionNotice text="Du har inga aktiva annonser." />
+                  <SectionNotice text={t('noActiveListings')} />
                 )}
               </ProfileSection>
 
-              <ProfileSection title="Sålda annonser" count={soldListings.length}>
+              <ProfileSection title={t('soldListings')} count={soldListings.length}>
                 {listingsLoading ? (
-                  <SectionNotice text="Hämtar annonser..." loading />
+                  <SectionNotice text={t('loadingListings')} loading />
                 ) : soldListings.length > 0 ? (
                   soldListings.map((listing) => (
                     <ListingRow
@@ -239,7 +244,7 @@ export default function ProfileScreen() {
                     />
                   ))
                 ) : (
-                  <SectionNotice text="Du har inga sålda annonser." />
+                  <SectionNotice text={t('noSoldListings')} />
                 )}
               </ProfileSection>
 
@@ -249,11 +254,11 @@ export default function ProfileScreen() {
             <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
               <View style={styles.authHeader}>
                 <ThemedText style={styles.authTitle}>
-                  {mode === 'signin' ? 'Logga in' : 'Skapa konto'}
+                  {mode === 'signin' ? t('signIn') : t('signUp')}
                 </ThemedText>
                 <Pressable onPress={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
                   <ThemedText style={styles.authSwitch}>
-                    {mode === 'signin' ? 'Skapa konto' : 'Logga in'}
+                    {mode === 'signin' ? t('signUp') : t('signIn')}
                   </ThemedText>
                 </Pressable>
               </View>
@@ -278,7 +283,7 @@ export default function ProfileScreen() {
               <TextInput
                 autoCapitalize="none"
                 onChangeText={setPassword}
-                placeholder="Lösenord"
+                placeholder={t('password')}
                 placeholderTextColor={theme.textSecondary}
                 secureTextEntry
                 style={[
@@ -302,7 +307,7 @@ export default function ProfileScreen() {
                   { opacity: submitting || !email.trim() || !password ? 0.55 : 1 },
                 ]}>
                 <ThemedText style={styles.primaryButtonText}>
-                  {submitting ? 'Vänta...' : mode === 'signin' ? 'Logga in' : 'Skapa konto'}
+                  {submitting ? t('wait') : mode === 'signin' ? t('signIn') : t('signUp')}
                 </ThemedText>
               </Pressable>
             </View>
@@ -365,6 +370,7 @@ function ListingRow({
   onDelete: () => void;
 }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const nationName = getNation(listing.nationId).name;
   const showTradeBadge = listing.dealType === 'trade' || listing.dealType === 'both';
 
@@ -385,20 +391,20 @@ function ListingRow({
           {listing.eventName}
         </ThemedText>
         <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-          {nationName} · {formatTicketQuantity(listing.quantity)} st
+          {nationName} · {formatTicketQuantity(listing.quantity)} {t('pcs')}
         </ThemedText>
       </View>
 
       {showTradeBadge && !sold && (
         <View style={styles.tradeBadge}>
-          <ThemedText style={styles.tradeBadgeText}>Byte</ThemedText>
+          <ThemedText style={styles.tradeBadgeText}>{t('trade')}</ThemedText>
         </View>
       )}
 
       {sold ? (
         <>
           <View style={styles.soldBadge}>
-            <ThemedText style={styles.soldBadgeText}>Såld</ThemedText>
+            <ThemedText style={styles.soldBadgeText}>{t('sold')}</ThemedText>
           </View>
           <Pressable
             accessibilityLabel="Ta bort annons"
@@ -437,6 +443,7 @@ function ListingActionModal({
   onMarkSold: () => void;
 }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const showMarkSold = !!listing && !listing.isSold;
 
   return (
@@ -447,7 +454,7 @@ function ListingActionModal({
       onRequestClose={onCancel}>
       <View style={styles.modalBackdrop}>
         <View style={[styles.confirmCard, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-          <ThemedText style={styles.confirmTitle}>Hantera annons</ThemedText>
+          <ThemedText style={styles.confirmTitle}>{t('manageListing')}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.confirmCopy}>
             {listing ? listing.eventName : ''}
           </ThemedText>
@@ -457,7 +464,7 @@ function ListingActionModal({
               onPress={onMarkSold}
               style={[styles.confirmButton, styles.markSoldButton, { opacity: pending ? 0.5 : 1 }]}>
               <ThemedText style={styles.markSoldButtonText}>
-                {pending ? 'Vänta...' : 'Markera som såld'}
+                {pending ? t('wait') : t('markAsSold')}
               </ThemedText>
             </Pressable>
           )}
@@ -466,14 +473,14 @@ function ListingActionModal({
               disabled={pending}
               onPress={onCancel}
               style={[styles.confirmButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
-              <ThemedText style={styles.cancelButtonText}>Avbryt</ThemedText>
+              <ThemedText style={styles.cancelButtonText}>{t('cancel')}</ThemedText>
             </Pressable>
             <Pressable
               disabled={pending}
               onPress={onDelete}
               style={[styles.confirmButton, styles.confirmDeleteButton, { opacity: pending ? 0.5 : 1 }]}>
               <ThemedText style={styles.confirmDeleteText}>
-                {pending ? 'Vänta...' : 'Ta bort'}
+                {pending ? t('wait') : t('delete')}
               </ThemedText>
             </Pressable>
           </View>
@@ -493,22 +500,12 @@ const styles = StyleSheet.create({
   headerInner: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: Spacing.two,
-    minHeight: 56,
+    justifyContent: 'center',
+    minHeight: SecondaryHeaderHeight,
     paddingHorizontal: Spacing.three,
   },
-  backButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  backButtonText: {
-    color: '#1D2430',
-    fontSize: 30,
-    fontWeight: '500',
-    lineHeight: 30,
+  headerSide: {
+    width: 92,
   },
   headerTitle: {
     color: '#1D2430',
@@ -516,13 +513,24 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
+    textAlign: 'center',
+  },
+  headerRight: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.two,
+    justifyContent: 'flex-end',
+    width: 92,
   },
   settingsButton: {
     alignItems: 'center',
     borderRadius: 8,
-    height: 32,
+    height: 40,
     justifyContent: 'center',
-    width: 32,
+    width: 40,
+  },
+  settingsButtonPressed: {
+    opacity: 0.65,
   },
   scrollView: {
     flex: 1,

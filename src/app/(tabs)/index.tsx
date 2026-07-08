@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   FlatList,
   Modal,
   PanResponder,
@@ -16,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 
 import { ChatModal } from '@/components/chat-modal';
+import { LanguageToggle } from '@/components/language-toggle';
 import { Logo } from '@/components/logo';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
@@ -23,7 +25,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
-import { getNation } from '@/lib/nations';
+import { useI18n } from '@/lib/i18n';
+import { getNation, nationMatchesQuery } from '@/lib/nations';
 import { ReportModal } from '@/components/report-modal';
 import {
   Listing,
@@ -33,17 +36,23 @@ import {
 } from '@/lib/tickets';
 
 const TICKET_TYPE_FILTERS = [
-  { id: 'all', label: 'Alla' },
   { id: 'Förköp', label: 'Förköp' },
   { id: 'Eftersläpp', label: 'Eftersläpp' },
+  { id: 'Annan', label: 'Annan' },
 ];
+
+const DEAL_FILTERS = [
+  { id: 'sell', translationKey: 'sellListing' },
+  { id: 'trade', translationKey: 'tradeListing' },
+] as const;
 
 export default function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
-  const [ticketTypeFilter, setTicketTypeFilter] = useState('all');
-  const [dealFilter, setDealFilter] = useState<'all' | 'sell' | 'trade'>('all');
+  const [ticketTypeFilter, setTicketTypeFilter] = useState<string | null>(null);
+  const [dealFilter, setDealFilter] = useState<'sell' | 'trade' | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [chatListing, setChatListing] = useState<Listing | null>(null);
@@ -65,12 +74,12 @@ export default function HomeScreen() {
       setListingsError(null);
     } catch (error) {
       if (!isActive()) return;
-      setListingsError(error instanceof Error ? error.message : 'Kunde inte hämta annonser.');
+      setListingsError(error instanceof Error ? error.message : t('listingFetchErrorSentence'));
     } finally {
       if (!isActive()) return;
       setListingsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,22 +103,29 @@ export default function HomeScreen() {
 
     return listings
       .filter((listing) => !listing.isSold)
-      .filter((listing) => ticketTypeFilter === 'all' || listing.ticketType === ticketTypeFilter)
       .filter((listing) => {
-        if (dealFilter === 'all') return true;
+        if (!ticketTypeFilter) return true;
+        if (ticketTypeFilter === 'Annan') {
+          return listing.ticketType === 'Annan' || listing.ticketType.startsWith('Annan:');
+        }
+        return listing.ticketType === ticketTypeFilter;
+      })
+      .filter((listing) => {
+        if (!dealFilter) return true;
         if (dealFilter === 'sell') return listing.dealType === 'sell' || listing.dealType === 'both';
         return listing.dealType === 'trade' || listing.dealType === 'both';
       })
       .filter((listing) => {
         if (!query) return true;
+        const nation = getNation(listing.nationId);
         return (
           listing.eventName.toLowerCase().includes(query) ||
-          getNation(listing.nationId).name.toLowerCase().includes(query)
+          nationMatchesQuery(nation, query)
         );
       })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [ticketTypeFilter, dealFilter, listings, search]);
-  const filtersActive = ticketTypeFilter !== 'all' || dealFilter !== 'all';
+  const filtersActive = !!ticketTypeFilter || !!dealFilter;
 
   return (
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
@@ -124,24 +140,31 @@ export default function HomeScreen() {
             },
           ]}>
           <View style={styles.headerRow}>
+            <View style={styles.headerSide}>
+              <LanguageToggle />
+            </View>
             <View style={styles.brandBlock}>
               <Logo />
             </View>
-            <Pressable
-              accessibilityLabel="Lägg upp annons"
-              style={({ pressed }) => [
-                styles.createButton,
-                pressed && styles.createButtonPressed,
-              ]}
-              onPress={() => router.push('/sell')}>
-              <ThemedText style={styles.createButtonText}>+</ThemedText>
-            </Pressable>
+            <View style={[styles.headerSide, styles.headerSideRight]}>
+              <Pressable
+                accessibilityLabel={t('sell')}
+                style={({ pressed }) => [
+                  styles.createButton,
+                  pressed && styles.createButtonPressed,
+                ]}
+                onPress={() => router.push('/sell')}>
+                <ThemedText style={styles.createButtonText}>+</ThemedText>
+              </Pressable>
+            </View>
           </View>
         </View>
 
         <FlatList
           data={filteredListings}
           keyExtractor={(item) => item.id}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -161,8 +184,8 @@ export default function HomeScreen() {
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Sök event eller nation"
-                placeholderTextColor={theme.textSecondary}
+                placeholder='"förköp casa", "gbg"...'
+                placeholderTextColor="rgba(104,114,131,0.62)"
                 style={[
                   styles.searchInput,
                   {
@@ -185,7 +208,7 @@ export default function HomeScreen() {
                   ]}>
                   <ThemedText
                     style={[styles.filterToggleText, filtersOpen && styles.filterToggleTextActive]}>
-                    Filtrera
+                    {t('filter')}
                   </ThemedText>
                   {filtersActive && <View style={styles.filterDot} />}
                   <ThemedText
@@ -195,7 +218,7 @@ export default function HomeScreen() {
                 </Pressable>
 
                 <ThemedText type="small" themeColor="textSecondary">
-                  {listingsLoading ? 'Hämtar annonser...' : `${filteredListings.length} annonser`}
+                  {listingsLoading ? t('loadingListings') : `${filteredListings.length} ${t('listings')}`}
                 </ThemedText>
               </View>
 
@@ -207,7 +230,7 @@ export default function HomeScreen() {
                   ]}>
                   <View style={styles.filterGroup}>
                     <ThemedText type="small" themeColor="textSecondary" style={styles.filterGroupLabel}>
-                      Biljettyp
+                      {t('ticketType')}
                     </ThemedText>
                     <View style={styles.chipRow}>
                       {TICKET_TYPE_FILTERS.map((item) => (
@@ -215,7 +238,7 @@ export default function HomeScreen() {
                           key={item.id}
                           label={item.label}
                           active={ticketTypeFilter === item.id}
-                          onPress={() => setTicketTypeFilter(item.id)}
+                          onPress={() => setTicketTypeFilter((current) => (current === item.id ? null : item.id))}
                         />
                       ))}
                     </View>
@@ -223,24 +246,17 @@ export default function HomeScreen() {
 
                   <View style={styles.filterGroup}>
                     <ThemedText type="small" themeColor="textSecondary" style={styles.filterGroupLabel}>
-                      Typ av annons
+                      {t('listingType')}
                     </ThemedText>
-                    <View style={styles.segment}>
-                      <SegmentButton
-                        label="Alla"
-                        active={dealFilter === 'all'}
-                        onPress={() => setDealFilter('all')}
-                      />
-                      <SegmentButton
-                        label="Köpa"
-                        active={dealFilter === 'sell'}
-                        onPress={() => setDealFilter('sell')}
-                      />
-                      <SegmentButton
-                        label="Byta"
-                        active={dealFilter === 'trade'}
-                        onPress={() => setDealFilter('trade')}
-                      />
+                    <View style={styles.chipRow}>
+                      {DEAL_FILTERS.map((item) => (
+                        <FilterChip
+                          key={item.id}
+                          label={t(item.translationKey)}
+                          active={dealFilter === item.id}
+                          onPress={() => setDealFilter((current) => (current === item.id ? null : item.id))}
+                        />
+                      ))}
                     </View>
                   </View>
                 </View>
@@ -257,10 +273,10 @@ export default function HomeScreen() {
               ) : (
                 <>
                   <ThemedText style={styles.emptyTitle}>
-                    {listingsError ? 'Kunde inte hämta annonser' : 'Inga biljetter hittades'}
+                    {listingsError ? t('listingFetchError') : t('noTicketsFound')}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" style={styles.emptyCopy}>
-                    {listingsError ?? 'Prova en bredare sökning eller byt filter.'}
+                    {listingsError ?? t('broadenSearch')}
                   </ThemedText>
                 </>
               )}
@@ -318,24 +334,9 @@ function FilterChip({
   );
 }
 
-function SegmentButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
-      <ThemedText style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</ThemedText>
-    </Pressable>
-  );
-}
-
 function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const nationName = getNation(listing.nationId).name;
 
   return (
@@ -358,7 +359,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
             </ThemedText>
             <View style={styles.quantityPill}>
               <ThemedText style={styles.quantityText}>
-                {formatTicketQuantity(listing.quantity)} st
+                {formatTicketQuantity(listing.quantity)} {t('pcs')}
               </ThemedText>
             </View>
           </View>
@@ -372,20 +373,20 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         {(listing.dealType === 'sell' || listing.dealType === 'both') && (
           <View style={[styles.badge, styles.sellBadge]}>
             <ThemedText style={styles.sellBadgeText}>
-              {listing.price ? `${listing.price} kr/st` : 'Säljes'}
+              {listing.price ? `${listing.price} ${t('perTicket')}` : t('forSale')}
             </ThemedText>
           </View>
         )}
         {(listing.dealType === 'trade' || listing.dealType === 'both') && (
           <View style={[styles.badge, styles.tradeBadge]}>
             <ThemedText style={styles.tradeBadgeText} numberOfLines={1}>
-              Byte: {listing.tradeDescription ?? 'förslag'}
+              {t('trade')}: {listing.tradeDescription ?? t('suggestion')}
             </ThemedText>
           </View>
         )}
         {listing.isHot && (
           <View style={[styles.badge, styles.hotBadge]}>
-            <ThemedText style={styles.hotBadgeText}>Populär</ThemedText>
+            <ThemedText style={styles.hotBadgeText}>{t('popular')}</ThemedText>
           </View>
         )}
       </View>
@@ -407,13 +408,21 @@ function ListingModal({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useI18n();
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const nationName = listing ? getNation(listing.nationId).name : '';
   const titleText = listing ? listing.ticketType : '';
   const isOwnListing = !!user && !!listing && listing.userId === user.id;
 
   useEffect(() => {
-    sheetTranslateY.setValue(0);
+    if (!listing) return;
+    sheetTranslateY.setValue(36);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   }, [listing?.id, sheetTranslateY]);
 
   const closeFromDrag = useCallback(() => {
@@ -464,7 +473,7 @@ function ListingModal({
   );
 
   return (
-    <Modal animationType="slide" transparent visible={!!listing} onRequestClose={onClose}>
+    <Modal animationType="fade" transparent visible={!!listing} onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <Pressable
           accessibilityLabel="Stäng annons"
@@ -498,36 +507,36 @@ function ListingModal({
                 </View>
 
                 <View style={styles.modalStats}>
-                  <Stat label="Antal" value={`${formatTicketQuantity(listing.quantity)} st`} />
+                  <Stat label={t('quantity')} value={`${formatTicketQuantity(listing.quantity)} ${t('pcs')}`} />
                   {(listing.dealType === 'sell' || listing.dealType === 'both') && listing.price && (
-                    <Stat label="Pris" value={`${listing.price} kr/st`} />
+                    <Stat label={t('price')} value={`${listing.price} ${t('perTicket')}`} />
                   )}
-                  <Stat label="Upplagd" value={formatRelativeTime(listing.createdAt)} />
+                  <Stat label={t('posted')} value={formatRelativeTime(listing.createdAt)} />
                 </View>
 
-                <ThemedText style={styles.sectionLabel}>Beskrivning</ThemedText>
+                <ThemedText style={styles.sectionLabel}>{t('description')}</ThemedText>
                 <ThemedText style={styles.description}>{listing.description}</ThemedText>
 
                 {listing.tradeDescription && (
                   <>
-                    <ThemedText style={styles.sectionLabel}>Vill byta mot</ThemedText>
+                    <ThemedText style={styles.sectionLabel}>{t('tradeWant')}</ThemedText>
                     <ThemedText style={styles.description}>{listing.tradeDescription}</ThemedText>
                   </>
                 )}
 
                 {isOwnListing ? (
                   <ThemedText type="small" themeColor="textSecondary" style={styles.ownListingNote}>
-                    Det här är din egen annons. Hantera den under Profil.
+                    {t('soldByOwnerNote')}
                   </ThemedText>
                 ) : (
                   <>
                     <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
-                      <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
+                      <ThemedText style={styles.primaryActionText}>💬 {t('contactSeller')}</ThemedText>
                     </Pressable>
 
                     <Pressable style={styles.reportLink} onPress={() => onReport(listing)}>
                       <ThemedText type="small" style={styles.reportLinkText}>
-                        🚩 Rapportera annons
+                        🚩 {t('reportListing')}
                       </ThemedText>
                     </Pressable>
                   </>
@@ -578,10 +587,18 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingTop: 4,
   },
+  headerSide: {
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  headerSideRight: {
+    alignItems: 'flex-end',
+  },
   brandBlock: {
+    alignItems: 'center',
+    flex: 1,
     height: 36,
     justifyContent: 'center',
-    minWidth: 150,
   },
   createButton: {
     alignItems: 'center',
@@ -671,6 +688,7 @@ const styles = StyleSheet.create({
   },
   chipRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
   },
   chip: {
@@ -685,30 +703,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chipTextActive: {
-    color: '#1D2430',
-  },
-  segment: {
-    backgroundColor: '#EEF0F4',
-    borderRadius: 8,
-    flexDirection: 'row',
-    padding: 3,
-  },
-  segmentButton: {
-    alignItems: 'center',
-    borderRadius: 6,
-    flex: 1,
-    minHeight: 38,
-    justifyContent: 'center',
-  },
-  segmentButtonActive: {
-    backgroundColor: '#FFFFFF',
-  },
-  segmentText: {
-    color: '#776B63',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  segmentTextActive: {
     color: '#1D2430',
   },
   card: {

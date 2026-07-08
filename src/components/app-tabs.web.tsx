@@ -13,24 +13,30 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useI18n } from '@/lib/i18n';
 
 export default function AppTabs() {
+  const { t } = useI18n();
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
-            <TabButton>Köp</TabButton>
+            <TabButton>{t('buy')}</TabButton>
           </TabTrigger>
           <TabTrigger name="sell" href="/sell" asChild>
-            <SellTabButton>+ Lägg upp</SellTabButton>
+            <SellTabButton>+ {t('sell')}</SellTabButton>
           </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
-            <TabButton>Meddelanden</TabButton>
+            <TabButton>{t('messages')}</TabButton>
           </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton>Profil</TabButton>
+            <TabButton>{t('profile')}</TabButton>
+          </TabTrigger>
+          <TabTrigger name="settings" href="/settings" asChild>
+            <View style={styles.hiddenTabTrigger} />
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -126,5 +132,10 @@ const styles = StyleSheet.create({
   },
   sellButtonTextActive: {
     color: '#FFFFFF',
+  },
+  hiddenTabTrigger: {
+    height: 0,
+    opacity: 0,
+    width: 0,
   },
 });

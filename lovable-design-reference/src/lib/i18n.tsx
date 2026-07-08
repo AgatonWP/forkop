@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, ReactNode, useContext, useState } from "react";
 
 export type Language = "sv" | "en";
 
@@ -50,7 +50,7 @@ const translations = {
     "create.eventName": "Evenemangsnamn",
     "create.ticketType": "Biljetttyp",
     "create.quantity": "Antal",
-    "create.dealType": "Typ av annons",
+    "create.dealType": "Annonstyp",
     "create.price": "Pris (SEK)",
     "create.tradeDesc": "Vad vill du ha?",
     "create.description": "Beskrivning",

@@ -13,7 +13,7 @@ export const Colors = {
     background: '#F6F7F9',
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#E6E9EE',
-    backgroundHeader: 'rgba(255,255,255,0.94)',
+    backgroundHeader: '#FFFFFF',
     textSecondary: '#687283',
   },
   dark: {
@@ -65,3 +65,4 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80, web: 72 }) ?? 0;
 export const MaxContentWidth = 800;
+export const SecondaryHeaderHeight = 48;

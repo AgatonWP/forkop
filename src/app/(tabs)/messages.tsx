@@ -6,9 +6,10 @@ import { ChatModal } from '@/components/chat-modal';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, SecondaryHeaderHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import {
   Conversation,
   Message,
@@ -29,6 +30,7 @@ export default function MessagesScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { initializing, user } = useAuth();
+  const { t } = useI18n();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,9 +76,9 @@ export default function MessagesScreen() {
 
       setItems(nextItems);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kunde inte hämta meddelanden.');
+      setError(err instanceof Error ? err.message : t('messagesFetchError'));
     }
-  }, [user]);
+  }, [t, user]);
 
   useEffect(() => {
     if (initializing) return;
@@ -99,14 +101,14 @@ export default function MessagesScreen() {
     <ThemedView style={styles.screen}>
       <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
-          <ThemedText style={styles.headerTitle}>Meddelanden</ThemedText>
+          <ThemedText style={styles.headerTitle}>{t('messages')}</ThemedText>
         </View>
       </SafeAreaView>
 
       {!initializing && !user ? (
         <View style={styles.centerNotice}>
           <ThemedText type="small" themeColor="textSecondary">
-            Logga in för att se dina meddelanden.
+            {t('messagesLoginRequired')}
           </ThemedText>
         </View>
       ) : (
@@ -128,9 +130,9 @@ export default function MessagesScreen() {
               </View>
             ) : (
               <View style={styles.centerNotice}>
-                <ThemedText style={styles.emptyTitle}>Inga meddelanden än</ThemedText>
+                <ThemedText style={styles.emptyTitle}>{t('noMessagesYet')}</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.emptyCopy}>
-                  {error ?? 'Kontakta en säljare från en annons för att starta en chatt.'}
+                  {error ?? t('startChatHint')}
                 </ThemedText>
               </View>
             )
@@ -149,6 +151,7 @@ export default function MessagesScreen() {
 
 function InboxRow({ item, onPress }: { item: InboxItem; onPress: () => void }) {
   const theme = useTheme();
+  const { t } = useI18n();
   const nationName = getNation(item.listing.nationId).name;
 
   return (
@@ -165,11 +168,11 @@ function InboxRow({ item, onPress }: { item: InboxItem; onPress: () => void }) {
             {item.listing.eventName}
           </ThemedText>
           <View style={[styles.roleBadge, item.isSeller ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
-            <ThemedText style={styles.roleBadgeText}>{item.isSeller ? 'Säljare' : 'Köpare'}</ThemedText>
+            <ThemedText style={styles.roleBadgeText}>{item.isSeller ? t('seller') : t('buyer')}</ThemedText>
           </View>
         </View>
         <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-          {item.lastMessage ? item.lastMessage.text : `${nationName} · Ingen chatt ännu`}
+          {item.lastMessage ? item.lastMessage.text : `${nationName} · ${t('noChatYet')}`}
         </ThemedText>
       </View>
       {item.lastMessage && (
@@ -191,7 +194,8 @@ const styles = StyleSheet.create({
   headerInner: {
     alignItems: 'center',
     flexDirection: 'row',
-    minHeight: 56,
+    justifyContent: 'center',
+    minHeight: SecondaryHeaderHeight,
     paddingHorizontal: Spacing.three,
   },
   headerTitle: {
