@@ -67,16 +67,6 @@ export const EVENT_CATEGORIES: { id: EventCategory; label: string; keywords: str
   { id: 'other', label: 'Övrigt', keywords: [] },
 ];
 
-export const NATIONS: Record<string, string> = {
-  goteborgs: 'Göteborgs nation',
-  helsingkrona: 'Helsingkrona nation',
-  malmo: 'Malmö nation',
-  lunds: 'Lunds nation',
-  afborgen: 'AF-borgen',
-  karneval: 'Lundakarnevalen',
-  vg: 'Västgöta nation',
-};
-
 export function getEventCategory(listing: Listing): EventCategory {
   const name = listing.eventName.toLowerCase();
 
@@ -173,6 +163,11 @@ export async function fetchMyListings(userId: string): Promise<Listing[]> {
   }
 
   return (data ?? []).map((row) => mapListing(row as ListingRow));
+}
+
+export async function markListingSold(listing: Listing, userId: string): Promise<string> {
+  await deleteListing(listing.id, userId);
+  return listing.id;
 }
 
 export async function deleteListing(listingId: string, userId: string): Promise<void> {

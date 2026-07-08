@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useState } from 'react';
 import { router } from 'expo-router';
 import {
-  ActivityIndicator,
-  Animated,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -22,71 +18,60 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { LundEvent, fetchLundEvents } from '@/lib/stuk-events';
+import { NATIONS_LIST, getNation } from '@/lib/nations';
 import {
   DealType,
   MORE_THAN_MAX_TICKET_QUANTITY,
   formatTicketQuantity,
 } from '@/lib/tickets';
 
-
-const TICKET_TYPES = ['Inträde', 'Sittning', 'VIP', 'Helgpass', 'Gasque', 'Förköp', 'Annan'];
-const DEPRIORITIZED_EVENT_CATEGORIES = new Set<LundEvent['category']>(['valborg', 'karneval']);
-
-function getNationId(event: LundEvent | null, eventName: string) {
-  const haystack = `${event?.organizer ?? ''} ${eventName}`.toLowerCase();
-
-  if (haystack.includes('af-borgen') || haystack.includes('af borgen') || haystack.includes('t-bar')) return 'afborgen';
-  if (haystack.includes('helsingkrona')) return 'helsingkrona';
-  if (haystack.includes('göteborg') || haystack.includes('goteborg')) return 'goteborgs';
-  if (haystack.includes('malmö') || haystack.includes('malmo')) return 'malmo';
-  if (haystack.includes('västgöta') || haystack.includes('vastgota') || haystack.includes('vg')) return 'vg';
-  if (haystack.includes('karneval')) return 'karneval';
-  if (haystack.includes('lunds nation')) return 'lunds';
-
-  return 'other';
-}
+const TICKET_TYPES = ['Förköp', 'Eftersläpp', 'Inträde', 'Sittning', 'Gasque', 'VIP', 'Helgpass', 'Annan'];
+const MAX_TICKET_PRICE = 3000;
 
 export default function SellScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
-  const [events, setEvents] = useState<LundEvent[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
-
-  const [selectedEvent, setSelectedEvent] = useState<LundEvent | null>(null);
-  const [customEventName, setCustomEventName] = useState('');
-  const [ticketType, setTicketType] = useState('Inträde');
+  const [nationId, setNationId] = useState('');
+  const [customOrganizer, setCustomOrganizer] = useState('');
+  const [ticketType, setTicketType] = useState(TICKET_TYPES[0]);
   const [quantity, setQuantity] = useState(1);
   const [dealType, setDealType] = useState<DealType>('sell');
   const [price, setPrice] = useState('');
   const [tradeWant, setTradeWant] = useState('');
   const [description, setDescription] = useState('');
-  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [nationPickerOpen, setNationPickerOpen] = useState(false);
   const [ticketTypePickerOpen, setTicketTypePickerOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchLundEvents().then((data) => {
-      setEvents(data);
-      setEventsLoading(false);
-    });
-  }, []);
+  const selectedNation = nationId ? getNation(nationId) : null;
+  const organizerName = nationId === 'other' ? customOrganizer.trim() : (selectedNation?.name ?? '');
+  const eventDisplayName = organizerName ? `${organizerName} – ${ticketType}` : '';
 
-  const eventDisplayName = selectedEvent?.name ?? customEventName;
+  const numericPrice = Number(price);
   const canSubmit =
     !!user &&
-    eventDisplayName.trim().length > 0 &&
-    (dealType === 'trade' || Number(price) > 0) &&
+    organizerName.length > 0 &&
+    (dealType === 'trade' || (numericPrice > 0 && numericPrice <= MAX_TICKET_PRICE)) &&
     !submitting;
 
+  function handlePriceChange(value: string) {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) {
+      setPrice('');
+      return;
+    }
+
+    setPrice(String(Math.min(Number(digits), MAX_TICKET_PRICE)));
+  }
+
   function resetForm() {
-    setSelectedEvent(null);
-    setCustomEventName('');
-    setTicketType('Inträde');
+    setNationId('');
+    setCustomOrganizer('');
+    setTicketType(TICKET_TYPES[0]);
     setQuantity(1);
     setDealType('sell');
     setPrice('');
@@ -112,7 +97,7 @@ export default function SellScreen() {
       description: description.trim(),
       contact_method: '',
       contact_info: '',
-      nation_id: getNationId(selectedEvent, eventDisplayName),
+      nation_id: nationId,
     });
 
     setSubmitting(false);
@@ -182,36 +167,49 @@ export default function SellScreen() {
                 </View>
               )}
 
-              {/* Event picker */}
-              <FormSection label="Vilket event?">
+              {/* 1. Nation / arrangör */}
+              <FormSection label="1. Nation / arrangör">
                 <Pressable
-                  onPress={() => setEventPickerOpen(true)}
+                  onPress={() => setNationPickerOpen(true)}
                   style={[
                     styles.selectButton,
                     {
                       backgroundColor: theme.backgroundElement,
-                      borderColor: selectedEvent ? '#E39E7273' : theme.backgroundSelected,
+                      borderColor: selectedNation ? '#E39E7273' : theme.backgroundSelected,
                     },
                   ]}>
-                  {eventsLoading ? (
-                    <ActivityIndicator size="small" color={theme.textSecondary} />
-                  ) : (
-                    <ThemedText
-                      style={[
-                        styles.selectButtonText,
-                        !selectedEvent && !customEventName && { color: theme.textSecondary },
-                      ]}>
-                      {eventDisplayName || 'Välj eller sök event...'}
-                    </ThemedText>
-                  )}
+                  <ThemedText
+                    style={[
+                      styles.selectButtonText,
+                      !selectedNation && { color: theme.textSecondary },
+                    ]}>
+                    {selectedNation?.name ?? 'Välj nation eller arrangör...'}
+                  </ThemedText>
                   <ThemedText style={styles.chevron} themeColor="textSecondary">
                     ›
                   </ThemedText>
                 </Pressable>
+
+                {nationId === 'other' && (
+                  <TextInput
+                    value={customOrganizer}
+                    onChangeText={setCustomOrganizer}
+                    placeholder="Ange arrangör, t.ex. Kårhuset"
+                    placeholderTextColor={theme.textSecondary}
+                    style={[
+                      styles.textField,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.backgroundSelected,
+                        color: theme.text,
+                      },
+                    ]}
+                  />
+                )}
               </FormSection>
 
-              {/* Ticket type */}
-              <FormSection label="Biljettyp">
+              {/* 2. Ticket type */}
+              <FormSection label="2. Biljettyp">
                 <Pressable
                   onPress={() => setTicketTypePickerOpen(true)}
                   style={[
@@ -228,8 +226,8 @@ export default function SellScreen() {
                 </Pressable>
               </FormSection>
 
-              {/* Quantity */}
-              <FormSection label="Antal biljetter">
+              {/* 3. Quantity */}
+              <FormSection label="3. Antal biljetter">
                 <View style={styles.stepper}>
                   <Pressable
                     onPress={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -249,8 +247,8 @@ export default function SellScreen() {
                 </View>
               </FormSection>
 
-              {/* Deal type */}
-              <FormSection label="Jag vill...">
+              {/* 4. Deal type */}
+              <FormSection label="4. Jag vill...">
                 <View style={styles.segment}>
                   <SegmentButton
                     label="Sälja"
@@ -270,13 +268,13 @@ export default function SellScreen() {
                 </View>
               </FormSection>
 
-              {/* Price — shown when selling */}
+              {/* 5. Price — shown when selling */}
               {(dealType === 'sell' || dealType === 'both') && (
-                <FormSection label="Pris per biljett">
+                <FormSection label="5. Pris per biljett">
                   <View style={styles.priceRow}>
                     <TextInput
                       value={price}
-                      onChangeText={setPrice}
+                      onChangeText={handlePriceChange}
                       placeholder="150"
                       placeholderTextColor={theme.textSecondary}
                       keyboardType="numeric"
@@ -294,9 +292,9 @@ export default function SellScreen() {
                 </FormSection>
               )}
 
-              {/* Trade want — shown when trading */}
+              {/* 5. Trade want — shown when trading */}
               {(dealType === 'trade' || dealType === 'both') && (
-                <FormSection label="Vill byta mot">
+                <FormSection label="5. Vill byta mot">
                   <TextInput
                     value={tradeWant}
                     onChangeText={setTradeWant}
@@ -314,8 +312,8 @@ export default function SellScreen() {
                 </FormSection>
               )}
 
-              {/* Description */}
-              <FormSection label="Beskrivning (valfritt)">
+              {/* 6. Description */}
+              <FormSection label="6. Beskrivning (valfritt)">
                 <TextInput
                   value={description}
                   onChangeText={setDescription}
@@ -353,7 +351,7 @@ export default function SellScreen() {
               {!canSubmit && (
                 <ThemedText type="small" themeColor="textSecondary" style={styles.validationHint}>
                   {user
-                    ? `Fyll i event${dealType !== 'trade' ? ' och pris' : ''} för att lägga upp.`
+                    ? `Fyll i nation/arrangör${dealType !== 'trade' ? ` och pris (max ${MAX_TICKET_PRICE} kr)` : ''} för att lägga upp.`
                     : 'Logga in för att lägga upp.'}
                 </ThemedText>
               )}
@@ -362,31 +360,28 @@ export default function SellScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Event picker modal */}
-      <EventPickerModal
-        visible={eventPickerOpen}
-        events={events}
-        selected={selectedEvent}
-        onSelect={(event) => {
-          setSelectedEvent(event);
-          setCustomEventName('');
-          setEventPickerOpen(false);
+      {/* Nation / arrangör picker modal */}
+      <SimplePickerModal
+        visible={nationPickerOpen}
+        title="Nation / arrangör"
+        options={NATIONS_LIST.map((nation) => ({ id: nation.id, label: nation.name }))}
+        selectedId={nationId}
+        onSelect={(id) => {
+          setNationId(id);
+          if (id !== 'other') setCustomOrganizer('');
+          setNationPickerOpen(false);
         }}
-        onCustom={(name) => {
-          setCustomEventName(name);
-          setSelectedEvent(null);
-          setEventPickerOpen(false);
-        }}
-        onClose={() => setEventPickerOpen(false)}
+        onClose={() => setNationPickerOpen(false)}
       />
 
       {/* Ticket type picker modal */}
       <SimplePickerModal
         visible={ticketTypePickerOpen}
-        options={TICKET_TYPES}
-        selected={ticketType}
-        onSelect={(val) => {
-          setTicketType(val);
+        title="Biljettyp"
+        options={TICKET_TYPES.map((type) => ({ id: type, label: type }))}
+        selectedId={ticketType}
+        onSelect={(id) => {
+          setTicketType(id);
           setTicketTypePickerOpen(false);
         }}
         onClose={() => setTicketTypePickerOpen(false)}
@@ -424,214 +419,19 @@ function SegmentButton({
   );
 }
 
-function EventPickerModal({
-  visible,
-  events,
-  selected,
-  onSelect,
-  onCustom,
-  onClose,
-}: {
-  visible: boolean;
-  events: LundEvent[];
-  selected: LundEvent | null;
-  onSelect: (event: LundEvent) => void;
-  onCustom: (name: string) => void;
-  onClose: () => void;
-}) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
-  const inputRef = useRef<TextInput>(null);
-  const sheetTranslateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      sheetTranslateY.setValue(0);
-    }
-  }, [sheetTranslateY, visible]);
-
-  const closeFromDrag = useCallback(() => {
-    Animated.timing(sheetTranslateY, {
-      toValue: 420,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      sheetTranslateY.setValue(0);
-      onClose();
-    });
-  }, [onClose, sheetTranslateY]);
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onStartShouldSetPanResponderCapture: () => true,
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          gesture.dy > 2 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-        onPanResponderMove: (_, gesture) => {
-          sheetTranslateY.setValue(Math.max(0, gesture.dy));
-        },
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy > 90 || gesture.vy > 1.1) {
-            closeFromDrag();
-            return;
-          }
-
-          Animated.spring(sheetTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 5,
-          }).start();
-        },
-        onPanResponderTerminate: () => {
-          Animated.spring(sheetTranslateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 5,
-          }).start();
-        },
-        onPanResponderTerminationRequest: () => false,
-      }),
-    [closeFromDrag, sheetTranslateY],
-  );
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) {
-      return events.filter((e) => !DEPRIORITIZED_EVENT_CATEGORIES.has(e.category));
-    }
-
-    return events.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        (e.organizer ?? '').toLowerCase().includes(q)
-    );
-  }, [events, query]);
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-      onShow={() => setTimeout(() => inputRef.current?.focus(), 100)}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-        style={styles.modalBackdrop}>
-        <Pressable
-          accessibilityLabel="Stäng eventväljare"
-          onPress={onClose}
-          style={styles.modalBackdropPressable}
-        />
-        <Animated.View
-          style={[
-            styles.modalAnimatedSheet,
-            { transform: [{ translateY: sheetTranslateY }] },
-          ]}>
-          <ThemedView
-            type="backgroundElement"
-            style={[
-              styles.modalSheet,
-              styles.eventPickerSheet,
-              { paddingBottom: insets.bottom + Spacing.three },
-            ]}>
-            <View style={styles.modalDragArea} {...panResponder.panHandlers}>
-              <View style={styles.modalHandle} />
-            </View>
-
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Välj event</ThemedText>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
-              </Pressable>
-            </View>
-
-            <TextInput
-              ref={inputRef}
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Sök event..."
-              placeholderTextColor={theme.textSecondary}
-              style={[
-                styles.searchInput,
-                {
-                  backgroundColor: theme.background,
-                  borderColor: theme.backgroundSelected,
-                  color: theme.text,
-                },
-              ]}
-            />
-
-            <FlatList
-              data={filtered}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.eventListContent}
-              style={styles.eventList}
-              keyboardDismissMode="interactive"
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={
-                query.trim().length > 0 ? (
-                  <Pressable
-                    onPress={() => onCustom(query.trim())}
-                    style={[styles.eventRow, styles.customEventRow, { borderColor: theme.backgroundSelected }]}>
-                    <View style={styles.eventRowContent}>
-                      <ThemedText style={styles.eventName}>{`"${query.trim()}"`}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        Lägg till som eget event
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
-                  </Pressable>
-                ) : null
-              }
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => onSelect(item)}
-                  style={({ pressed }) => [
-                    styles.eventRow,
-                    {
-                      backgroundColor:
-                        selected?.id === item.id ? '#FFC8A520' : 'transparent',
-                      borderColor: theme.backgroundSelected,
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}>
-                  <View style={styles.eventRowContent}>
-                    <ThemedText style={styles.eventName}>{item.name}</ThemedText>
-                    {item.organizer && (
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {item.organizer}
-                      </ThemedText>
-                    )}
-                  </View>
-                  {selected?.id === item.id && (
-                    <ThemedText style={styles.checkmark}>✓</ThemedText>
-                  )}
-                </Pressable>
-              )}
-            />
-          </ThemedView>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
 function SimplePickerModal({
   visible,
+  title,
   options,
-  selected,
+  selectedId,
   onSelect,
   onClose,
 }: {
   visible: boolean;
-  options: string[];
-  selected: string;
-  onSelect: (val: string) => void;
+  title: string;
+  options: { id: string; label: string }[];
+  selectedId: string;
+  onSelect: (id: string) => void;
   onClose: () => void;
 }) {
   const theme = useTheme();
@@ -644,34 +444,36 @@ function SimplePickerModal({
       transparent
       onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
+        <Pressable
+          accessibilityLabel="Stäng"
+          onPress={onClose}
+          style={styles.modalBackdropPressable}
+        />
         <ThemedView
           type="backgroundElement"
           style={[styles.modalSheet, { paddingBottom: insets.bottom + Spacing.three }]}>
           <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <ThemedText style={styles.modalTitle}>Biljettyp</ThemedText>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
-            </Pressable>
-          </View>
-          {options.map((opt) => (
-            <Pressable
-              key={opt}
-              onPress={() => onSelect(opt)}
-              style={({ pressed }) => [
-                styles.eventRow,
-                {
-                  backgroundColor: selected === opt ? '#FFC8A520' : 'transparent',
-                  borderColor: theme.backgroundSelected,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}>
-              <ThemedText style={styles.eventName}>{opt}</ThemedText>
-              {selected === opt && (
-                <ThemedText style={styles.checkmark}>✓</ThemedText>
-              )}
-            </Pressable>
-          ))}
+          <ThemedText style={styles.modalTitle}>{title}</ThemedText>
+          <ScrollView style={styles.optionScroll} keyboardShouldPersistTaps="handled">
+            {options.map((opt) => (
+              <Pressable
+                key={opt.id}
+                onPress={() => onSelect(opt.id)}
+                style={({ pressed }) => [
+                  styles.eventRow,
+                  {
+                    backgroundColor: selectedId === opt.id ? '#FFC8A520' : 'transparent',
+                    borderColor: theme.backgroundSelected,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}>
+                <ThemedText style={styles.eventName}>{opt.label}</ThemedText>
+                {selectedId === opt.id && (
+                  <ThemedText style={styles.checkmark}>✓</ThemedText>
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
         </ThemedView>
       </View>
     </Modal>
@@ -908,26 +710,13 @@ const styles = StyleSheet.create({
   modalBackdropPressable: {
     ...StyleSheet.absoluteFillObject,
   },
-  modalAnimatedSheet: {
-    width: '100%',
-  },
   modalSheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
+    maxHeight: '78%',
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     gap: Spacing.three,
-  },
-  eventPickerSheet: {
-    maxHeight: '78%',
-  },
-  modalDragArea: {
-    alignItems: 'center',
-    marginHorizontal: -Spacing.three,
-    marginTop: -Spacing.two,
-    paddingBottom: Spacing.two,
-    paddingTop: Spacing.two,
   },
   modalHandle: {
     alignSelf: 'center',
@@ -936,39 +725,13 @@ const styles = StyleSheet.create({
     height: 4,
     width: 42,
   },
-  modalHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   modalTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#1D2430',
   },
-  closeButton: {
-    backgroundColor: '#F0F1F4',
-    borderRadius: 8,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 8,
-  },
-  closeButtonText: {
-    color: '#1D2430',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  searchInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    fontSize: 16,
-    minHeight: 44,
-    paddingHorizontal: Spacing.three,
-  },
-  eventList: {
+  optionScroll: {
     flexGrow: 0,
-  },
-  eventListContent: {
-    paddingBottom: Spacing.four,
   },
   eventRow: {
     alignItems: 'center',
@@ -978,15 +741,6 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.two,
-  },
-  customEventRow: {
-    borderRadius: 8,
-    borderWidth: 1,
-    marginVertical: Spacing.one,
-  },
-  eventRowContent: {
-    flex: 1,
-    gap: 2,
   },
   eventName: {
     fontSize: 16,

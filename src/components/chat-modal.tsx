@@ -18,7 +18,9 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { Message, getMessages, sendMessage } from '@/lib/messages';
-import { Listing, NATIONS, formatTicketQuantity } from '@/lib/tickets';
+import { getNation } from '@/lib/nations';
+import { Listing, formatTicketQuantity } from '@/lib/tickets';
+import { ReportModal } from '@/components/report-modal';
 
 type Props = {
   listing: Listing | null;
@@ -31,6 +33,7 @@ export function ChatModal({ listing, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
   const screenTranslateX = useRef(new Animated.Value(0)).current;
 
@@ -120,7 +123,7 @@ export function ChatModal({ listing, onClose }: Props) {
 
   if (!listing) return null;
 
-  const nationName = NATIONS[listing.nationId] ?? listing.nationId;
+  const nationName = getNation(listing.nationId).name;
   const sellerName = listing.sellerName ?? nationName;
 
   return (
@@ -160,6 +163,13 @@ export function ChatModal({ listing, onClose }: Props) {
           </View>
           <View style={styles.headerRight}>
             <View style={styles.onlineDot} />
+            <Pressable
+              accessibilityLabel="Rapportera"
+              hitSlop={8}
+              onPress={() => setReportOpen(true)}
+              style={styles.moreButton}>
+              <ThemedText style={styles.moreIcon}>⋯</ThemedText>
+            </Pressable>
           </View>
         </View>
 
@@ -225,6 +235,13 @@ export function ChatModal({ listing, onClose }: Props) {
           </View>
         </View>
       </Animated.View>
+
+      <ReportModal
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        listing={listing}
+        mode="chat"
+      />
     </Modal>
   );
 }
@@ -301,14 +318,27 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 28,
+    flexDirection: 'row',
+    gap: Spacing.two,
+    justifyContent: 'flex-end',
   },
   onlineDot: {
     backgroundColor: '#34C759',
     borderRadius: 5,
     height: 10,
     width: 10,
+  },
+  moreButton: {
+    alignItems: 'center',
+    height: 28,
+    justifyContent: 'center',
+    width: 24,
+  },
+  moreIcon: {
+    color: '#1D2430',
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 20,
   },
 
   messageList: {

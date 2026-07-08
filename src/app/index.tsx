@@ -3,12 +3,11 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Image,
   Modal,
   PanResponder,
   Platform,
   Pressable,
-  ScrollView,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -23,62 +22,78 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getNation } from '@/lib/nations';
+import { ReportModal } from '@/components/report-modal';
 import {
-  EVENT_CATEGORIES,
-  EventCategory,
   Listing,
-  NATIONS,
   fetchActiveListings,
   formatRelativeTime,
   formatTicketQuantity,
-  getEventCategory,
 } from '@/lib/tickets';
 
-const VISIBLE_EVENT_CATEGORIES = EVENT_CATEGORIES.filter(
-  (item) => item.id !== 'valborg' && item.id !== 'karneval',
-);
+const TICKET_TYPE_FILTERS = [
+  { id: 'all', label: 'Alla' },
+  { id: 'Förköp', label: 'Förköp' },
+  { id: 'Eftersläpp', label: 'Eftersläpp' },
+];
 
 export default function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<EventCategory>('all');
+  const [ticketTypeFilter, setTicketTypeFilter] = useState('all');
   const [dealFilter, setDealFilter] = useState<'all' | 'sell' | 'trade'>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [chatListing, setChatListing] = useState<Listing | null>(null);
+  const [reportListing, setReportListing] = useState<Listing | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [listingsError, setListingsError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadListings = useCallback(async (isActive: () => boolean = () => true, showInitialLoader = false) => {
+    if (showInitialLoader) {
+      setListingsLoading(true);
+    }
+
+    try {
+      const items = await fetchActiveListings();
+      if (!isActive()) return;
+      setListings(items);
+      setListingsError(null);
+    } catch (error) {
+      if (!isActive()) return;
+      setListingsError(error instanceof Error ? error.message : 'Kunde inte hämta annonser.');
+    } finally {
+      if (!isActive()) return;
+      setListingsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
-    fetchActiveListings()
-      .then((items) => {
-        if (!isMounted) return;
-        setListings(items);
-        setListingsError(null);
-      })
-      .catch((error: Error) => {
-        if (!isMounted) return;
-        setListingsError(error.message);
-      })
-      .finally(() => {
-        if (!isMounted) return;
-        setListingsLoading(false);
-      });
+    loadListings(() => isMounted, true);
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadListings]);
+
+  const refreshListings = useCallback(() => {
+    setRefreshing(true);
+    loadListings().finally(() => {
+      setRefreshing(false);
+    });
+  }, [loadListings]);
 
   const filteredListings = useMemo(() => {
     const query = search.trim().toLowerCase();
 
     return listings
       .filter((listing) => !listing.isSold)
-      .filter((listing) => category === 'all' || getEventCategory(listing) === category)
+      .filter((listing) => ticketTypeFilter === 'all' || listing.ticketType === ticketTypeFilter)
       .filter((listing) => {
         if (dealFilter === 'all') return true;
         if (dealFilter === 'sell') return listing.dealType === 'sell' || listing.dealType === 'both';
@@ -88,12 +103,12 @@ export default function HomeScreen() {
         if (!query) return true;
         return (
           listing.eventName.toLowerCase().includes(query) ||
-          (NATIONS[listing.nationId] ?? listing.nationId).toLowerCase().includes(query)
+          getNation(listing.nationId).name.toLowerCase().includes(query)
         );
       })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [category, dealFilter, listings, search]);
-  const compactHeaderTop = Math.max(insets.top - 12, 8);
+  }, [ticketTypeFilter, dealFilter, listings, search]);
+  const filtersActive = ticketTypeFilter !== 'all' || dealFilter !== 'all';
 
   return (
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
@@ -104,24 +119,21 @@ export default function HomeScreen() {
             {
               borderBottomColor: theme.backgroundSelected,
               backgroundColor: theme.backgroundHeader,
-              paddingTop: compactHeaderTop,
+              paddingTop: insets.top + Spacing.two,
             },
           ]}>
           <View style={styles.headerRow}>
-            <View style={styles.logoBlock}>
-              <Image
-                source={require('@/assets/images/tixet-logo.png')}
-                resizeMode="contain"
-                style={styles.logoImage}
-              />
+            <View style={styles.brandBlock}>
+              <ThemedText style={styles.brandTitle}>FÖRKÖP LUND</ThemedText>
             </View>
             <Pressable
+              accessibilityLabel="Lägg upp annons"
               style={({ pressed }) => [
                 styles.createButton,
                 pressed && styles.createButtonPressed,
               ]}
               onPress={() => router.push('/sell')}>
-              <ThemedText style={styles.createButtonText}>Lägg upp</ThemedText>
+              <ThemedText style={styles.createButtonText}>+</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -129,6 +141,14 @@ export default function HomeScreen() {
         <FlatList
           data={filteredListings}
           keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshListings}
+              tintColor={theme.textSecondary}
+              colors={['#1D2430']}
+            />
+          }
           contentContainerStyle={[
             styles.listContent,
             {
@@ -152,40 +172,78 @@ export default function HomeScreen() {
                 ]}
               />
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.chipRow}>
-                  {VISIBLE_EVENT_CATEGORIES.map((item) => (
-                    <FilterChip
-                      key={item.id}
-                      label={item.label}
-                      active={category === item.id}
-                      onPress={() => setCategory(item.id)}
-                    />
-                  ))}
-                </View>
-              </ScrollView>
+              <View style={styles.filterToggleRow}>
+                <Pressable
+                  onPress={() => setFiltersOpen((open) => !open)}
+                  style={[
+                    styles.filterToggle,
+                    {
+                      backgroundColor: filtersOpen ? '#1D2430' : theme.backgroundElement,
+                      borderColor: filtersOpen ? '#1D2430' : theme.backgroundSelected,
+                    },
+                  ]}>
+                  <ThemedText
+                    style={[styles.filterToggleText, filtersOpen && styles.filterToggleTextActive]}>
+                    Filtrera
+                  </ThemedText>
+                  {filtersActive && <View style={styles.filterDot} />}
+                  <ThemedText
+                    style={[styles.filterToggleChevron, filtersOpen && styles.filterToggleTextActive]}>
+                    {filtersOpen ? '︿' : '﹀'}
+                  </ThemedText>
+                </Pressable>
 
-              <View style={styles.segment}>
-                <SegmentButton
-                  label="Alla"
-                  active={dealFilter === 'all'}
-                  onPress={() => setDealFilter('all')}
-                />
-                <SegmentButton
-                  label="Köpa"
-                  active={dealFilter === 'sell'}
-                  onPress={() => setDealFilter('sell')}
-                />
-                <SegmentButton
-                  label="Byta"
-                  active={dealFilter === 'trade'}
-                  onPress={() => setDealFilter('trade')}
-                />
+                <ThemedText type="small" themeColor="textSecondary">
+                  {listingsLoading ? 'Hämtar annonser...' : `${filteredListings.length} annonser`}
+                </ThemedText>
               </View>
 
-              <ThemedText type="small" themeColor="textSecondary">
-                {listingsLoading ? 'Hämtar annonser...' : `${filteredListings.length} aktiva annonser`}
-              </ThemedText>
+              {filtersOpen && (
+                <View
+                  style={[
+                    styles.filterPanel,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected, borderWidth: 1 },
+                  ]}>
+                  <View style={styles.filterGroup}>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.filterGroupLabel}>
+                      Biljettyp
+                    </ThemedText>
+                    <View style={styles.chipRow}>
+                      {TICKET_TYPE_FILTERS.map((item) => (
+                        <FilterChip
+                          key={item.id}
+                          label={item.label}
+                          active={ticketTypeFilter === item.id}
+                          onPress={() => setTicketTypeFilter(item.id)}
+                        />
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={styles.filterGroup}>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.filterGroupLabel}>
+                      Typ av annons
+                    </ThemedText>
+                    <View style={styles.segment}>
+                      <SegmentButton
+                        label="Alla"
+                        active={dealFilter === 'all'}
+                        onPress={() => setDealFilter('all')}
+                      />
+                      <SegmentButton
+                        label="Köpa"
+                        active={dealFilter === 'sell'}
+                        onPress={() => setDealFilter('sell')}
+                      />
+                      <SegmentButton
+                        label="Byta"
+                        active={dealFilter === 'trade'}
+                        onPress={() => setDealFilter('trade')}
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
           }
           renderItem={({ item }) => (
@@ -217,8 +275,18 @@ export default function HomeScreen() {
           setSelectedListing(null);
           setChatListing(l);
         }}
+        onReport={(l: Listing) => {
+          setSelectedListing(null);
+          setReportListing(l);
+        }}
       />
       <ChatModal listing={chatListing} onClose={() => setChatListing(null)} />
+      <ReportModal
+        visible={!!reportListing}
+        onClose={() => setReportListing(null)}
+        listing={reportListing}
+        mode="listing"
+      />
     </ThemedView>
   );
 }
@@ -267,7 +335,7 @@ function SegmentButton({
 
 function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const theme = useTheme();
-  const nationName = NATIONS[listing.nationId] ?? listing.nationId;
+  const nationName = getNation(listing.nationId).name;
 
   return (
     <Pressable
@@ -308,7 +376,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         {(listing.dealType === 'sell' || listing.dealType === 'both') && (
           <View style={[styles.badge, styles.sellBadge]}>
             <ThemedText style={styles.sellBadgeText}>
-              {listing.price ? `${listing.price} kr` : 'Säljes'}
+              {listing.price ? `${listing.price} kr/st` : 'Säljes'}
             </ThemedText>
           </View>
         )}
@@ -333,15 +401,22 @@ function ListingModal({
   listing,
   onClose,
   onChat,
+  onReport,
 }: {
   listing: Listing | null;
   onClose: () => void;
   onChat: (listing: Listing) => void;
+  onReport: (listing: Listing) => void;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const nationName = listing ? NATIONS[listing.nationId] ?? listing.nationId : '';
+  const nationName = listing ? getNation(listing.nationId).name : '';
+  const titleText = listing
+    ? listing.eventName.includes(' – ')
+      ? listing.eventName.slice(listing.eventName.indexOf(' – ') + 3)
+      : listing.eventName
+    : '';
 
   useEffect(() => {
     sheetTranslateY.setValue(0);
@@ -422,20 +497,18 @@ function ListingModal({
                   <View style={styles.modalHandle} />
                 </View>
                 <View style={styles.modalHeader}>
-                  <View>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {nationName}
-                    </ThemedText>
-                    <ThemedText style={styles.modalTitle}>{listing.eventName}</ThemedText>
-                  </View>
-                  <Pressable onPress={onClose} style={styles.closeButton}>
-                    <ThemedText style={styles.closeButtonText}>Stäng</ThemedText>
-                  </Pressable>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {nationName}
+                  </ThemedText>
+                  <ThemedText style={styles.modalTitle}>{titleText}</ThemedText>
                 </View>
 
                 <View style={styles.modalStats}>
                   <Stat label="Antal" value={`${formatTicketQuantity(listing.quantity)} st`} />
                   <Stat label="Typ" value={listing.ticketType} />
+                  {(listing.dealType === 'sell' || listing.dealType === 'both') && listing.price && (
+                    <Stat label="Pris" value={`${listing.price} kr/st`} />
+                  )}
                   <Stat label="Upplagd" value={formatRelativeTime(listing.createdAt)} />
                 </View>
 
@@ -451,6 +524,12 @@ function ListingModal({
 
                 <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
                   <ThemedText style={styles.primaryActionText}>💬 Kontakta säljaren</ThemedText>
+                </Pressable>
+
+                <Pressable style={styles.reportLink} onPress={() => onReport(listing)}>
+                  <ThemedText type="small" style={styles.reportLinkText}>
+                    🚩 Rapportera annons
+                  </ThemedText>
                 </Pressable>
               </>
             )}
@@ -495,30 +574,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingBottom: 8,
-    paddingTop: 6,
+    paddingBottom: 12,
+    paddingTop: 4,
   },
-  logoBlock: {
+  brandBlock: {
     height: 36,
     justifyContent: 'center',
-    width: 98,
+    minWidth: 150,
   },
-  logoImage: {
-    height: 36,
-    width: 98,
+  brandTitle: {
+    color: '#1D2430',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    lineHeight: 22,
   },
   createButton: {
+    alignItems: 'center',
     backgroundColor: '#1D2430',
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 34,
+    borderRadius: 18,
+    height: 36,
     justifyContent: 'center',
-    paddingHorizontal: 16,
     shadowColor: '#1D2430',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
+    width: 36,
   },
   createButtonPressed: {
     opacity: 0.82,
@@ -526,9 +607,9 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+    fontSize: 22,
+    fontWeight: '600',
+    lineHeight: 24,
   },
   listContent: {
     alignSelf: 'center',
@@ -548,6 +629,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 44,
     paddingHorizontal: Spacing.three,
+  },
+  filterToggleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  filterToggle: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 7,
+  },
+  filterToggleText: {
+    color: '#1D2430',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  filterToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  filterToggleChevron: {
+    color: '#1D2430',
+    fontSize: 11,
+  },
+  filterDot: {
+    backgroundColor: '#E39E72',
+    borderRadius: 999,
+    height: 6,
+    width: 6,
+  },
+  filterPanel: {
+    borderRadius: 10,
+    gap: Spacing.three,
+    padding: Spacing.two,
+  },
+  filterGroup: {
+    gap: Spacing.one,
+  },
+  filterGroupLabel: {
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   chipRow: {
     flexDirection: 'row',
@@ -723,27 +849,13 @@ const styles = StyleSheet.create({
     width: 42,
   },
   modalHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    gap: Spacing.three,
-    justifyContent: 'space-between',
+    gap: 2,
   },
   modalTitle: {
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: 0,
     lineHeight: 34,
-  },
-  closeButton: {
-    backgroundColor: '#F0F1F4',
-    borderRadius: 8,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 8,
-  },
-  closeButtonText: {
-    color: '#1D2430',
-    fontSize: 13,
-    fontWeight: '800',
   },
   modalStats: {
     flexDirection: 'row',
@@ -780,5 +892,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
+  },
+  reportLink: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  reportLinkText: {
+    color: '#A15353',
+    fontWeight: '700',
   },
 });

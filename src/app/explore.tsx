@@ -9,12 +9,13 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { getNation } from '@/lib/nations';
 import {
   Listing,
-  NATIONS,
   deleteListing,
   fetchMyListings,
   formatTicketQuantity,
+  markListingSold,
 } from '@/lib/tickets';
 
 export default function ProfileScreen() {
@@ -111,6 +112,29 @@ export default function ProfileScreen() {
       setDeleteCandidate(null);
     } catch (error) {
       setListingsError(error instanceof Error ? error.message : 'Kunde inte ta bort annonsen.');
+    } finally {
+      setPendingListingId(null);
+    }
+  }
+
+  async function handleMarkSold() {
+    if (!user || !deleteCandidate || pendingListingId || deleteCandidate.isSold) return;
+
+    const listing = deleteCandidate;
+    setPendingListingId(listing.id);
+    setListingsError(null);
+
+    try {
+      const soldListingId = await markListingSold(listing, user.id);
+      setListings((current) =>
+        current.map((item) =>
+          item.id === listing.id ? { ...item, id: soldListingId, isSold: true } : item,
+        ),
+      );
+      setDeleteCandidate(null);
+    } catch (error) {
+      setListingsError(error instanceof Error ? error.message : 'Kunde inte markera annonsen som såld.');
+      setDeleteCandidate(null);
     } finally {
       setPendingListingId(null);
     }
@@ -266,11 +290,12 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      <ConfirmDeleteModal
+      <ListingActionModal
         listing={deleteCandidate}
         pending={pendingListingId === deleteCandidate?.id}
         onCancel={() => setDeleteCandidate(null)}
-        onConfirm={handleDeleteListing}
+        onDelete={handleDeleteListing}
+        onMarkSold={handleMarkSold}
       />
     </ThemedView>
   );
@@ -320,7 +345,7 @@ function ListingRow({
   onDelete: () => void;
 }) {
   const theme = useTheme();
-  const nationName = NATIONS[listing.nationId] ?? listing.nationId;
+  const nationName = getNation(listing.nationId).name;
   const showTradeBadge = listing.dealType === 'trade' || listing.dealType === 'both';
 
   return (
@@ -378,18 +403,21 @@ function ListingRow({
   );
 }
 
-function ConfirmDeleteModal({
+function ListingActionModal({
   listing,
   pending,
   onCancel,
-  onConfirm,
+  onDelete,
+  onMarkSold,
 }: {
   listing: Listing | null;
   pending: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onDelete: () => void;
+  onMarkSold: () => void;
 }) {
   const theme = useTheme();
+  const showMarkSold = !!listing && !listing.isSold;
 
   return (
     <Modal
@@ -399,10 +427,20 @@ function ConfirmDeleteModal({
       onRequestClose={onCancel}>
       <View style={styles.modalBackdrop}>
         <View style={[styles.confirmCard, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-          <ThemedText style={styles.confirmTitle}>Ta bort annons?</ThemedText>
+          <ThemedText style={styles.confirmTitle}>Hantera annons</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.confirmCopy}>
-            {listing ? `${listing.eventName} tas bort permanent.` : ''}
+            {listing ? listing.eventName : ''}
           </ThemedText>
+          {showMarkSold && (
+            <Pressable
+              disabled={pending}
+              onPress={onMarkSold}
+              style={[styles.confirmButton, styles.markSoldButton, { opacity: pending ? 0.5 : 1 }]}>
+              <ThemedText style={styles.markSoldButtonText}>
+                {pending ? 'Vänta...' : 'Markera som såld'}
+              </ThemedText>
+            </Pressable>
+          )}
           <View style={styles.confirmActions}>
             <Pressable
               disabled={pending}
@@ -412,10 +450,10 @@ function ConfirmDeleteModal({
             </Pressable>
             <Pressable
               disabled={pending}
-              onPress={onConfirm}
+              onPress={onDelete}
               style={[styles.confirmButton, styles.confirmDeleteButton, { opacity: pending ? 0.5 : 1 }]}>
               <ThemedText style={styles.confirmDeleteText}>
-                {pending ? 'Tar bort...' : 'Ta bort'}
+                {pending ? 'Vänta...' : 'Ta bort'}
               </ThemedText>
             </Pressable>
           </View>
@@ -680,6 +718,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 40,
     paddingHorizontal: Spacing.three,
+  },
+  markSoldButton: {
+    backgroundColor: '#1D2430',
+    borderColor: '#1D2430',
+  },
+  markSoldButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   cancelButtonText: {
     color: '#1D2430',
