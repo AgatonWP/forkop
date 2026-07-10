@@ -1,9 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useTheme } from '@/hooks/use-theme';
+
 export function Logo() {
+  const theme = useTheme();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.main}>FÖRKÖP</Text>
+      <Text style={[styles.main, { color: theme.text }]}>FÖRKÖP</Text>
       <View style={styles.divider} />
       <Text style={styles.sub}>LUND</Text>
     </View>
@@ -17,7 +21,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   main: {
-    color: '#1D2430',
     fontSize: 20,
     fontWeight: '900',
     letterSpacing: -0.5,

@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -78,7 +87,10 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+        style={styles.backdrop}>
         <Pressable accessibilityLabel="Stäng" onPress={onClose} style={styles.backdropPressable} />
         <ThemedView
           type="backgroundElement"
@@ -87,77 +99,80 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
             { paddingBottom: insets.bottom + Spacing.three, borderColor: theme.backgroundSelected },
           ]}>
           <View style={styles.handle} />
-          <ThemedText style={styles.title}>{title}</ThemedText>
 
-          {!user ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Logga in för att kunna rapportera.
-            </ThemedText>
-          ) : done ? (
-            <ThemedText type="small" themeColor="textSecondary">
-              Vi har tagit emot din rapport och granskar den så snart som möjligt.
-            </ThemedText>
-          ) : showTargetStep ? (
-            <View style={styles.optionList}>
-              <TargetOptionRow
-                label="Annonsen"
-                description="Fel information, olämpligt innehåll eller bluff i annonsen."
-                onPress={() => setTargetType('listing')}
-              />
-              <TargetOptionRow
-                label="Användaren"
-                description="Olämpligt beteende eller meddelanden i chatten."
-                onPress={() => setTargetType('profile')}
-              />
-            </View>
-          ) : (
-            <>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
+            <ThemedText style={styles.title}>{title}</ThemedText>
+
+            {!user ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Logga in för att kunna rapportera.
+              </ThemedText>
+            ) : done ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                Vi har tagit emot din rapport och granskar den så snart som möjligt.
+              </ThemedText>
+            ) : showTargetStep ? (
               <View style={styles.optionList}>
-                {REPORT_REASONS.map((option) => (
-                  <Pressable
-                    key={option}
-                    onPress={() => setReason(option)}
-                    style={({ pressed }) => [
-                      styles.reasonRow,
-                      {
-                        borderColor: theme.backgroundSelected,
-                        backgroundColor: reason === option ? '#FFC8A520' : 'transparent',
-                        opacity: pressed ? 0.7 : 1,
-                      },
-                    ]}>
-                    <ThemedText style={styles.reasonText}>{option}</ThemedText>
-                    {reason === option && <ThemedText style={styles.checkmark}>✓</ThemedText>}
-                  </Pressable>
-                ))}
+                <TargetOptionRow
+                  label="Annonsen"
+                  description="Fel information, olämpligt innehåll eller bluff i annonsen."
+                  onPress={() => setTargetType('listing')}
+                />
+                <TargetOptionRow
+                  label="Användaren"
+                  description="Olämpligt beteende eller meddelanden i chatten."
+                  onPress={() => setTargetType('profile')}
+                />
               </View>
+            ) : (
+              <>
+                <View style={styles.optionList}>
+                  {REPORT_REASONS.map((option) => (
+                    <Pressable
+                      key={option}
+                      onPress={() => setReason(option)}
+                      style={({ pressed }) => [
+                        styles.reasonRow,
+                        {
+                          borderColor: theme.backgroundSelected,
+                          backgroundColor: reason === option ? '#FFC8A520' : 'transparent',
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}>
+                      <ThemedText style={styles.reasonText}>{option}</ThemedText>
+                      {reason === option && <ThemedText style={styles.checkmark}>✓</ThemedText>}
+                    </Pressable>
+                  ))}
+                </View>
 
-              <TextInput
-                value={details}
-                onChangeText={setDetails}
-                placeholder="Beskriv gärna vad som hänt (valfritt)"
-                placeholderTextColor={theme.textSecondary}
-                multiline
-                numberOfLines={3}
-                style={[
-                  styles.textArea,
-                  { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                ]}
-              />
+                <TextInput
+                  value={details}
+                  onChangeText={setDetails}
+                  placeholder="Beskriv gärna vad som hänt (valfritt)"
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  numberOfLines={3}
+                  style={[
+                    styles.textArea,
+                    { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                  ]}
+                />
 
-              {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
+                {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
-              <Pressable
-                disabled={!reason || submitting}
-                onPress={handleSubmit}
-                style={[styles.submitButton, (!reason || submitting) && styles.submitButtonDisabled]}>
-                <ThemedText style={styles.submitButtonText}>
-                  {submitting ? 'Skickar...' : 'Skicka rapport'}
-                </ThemedText>
-              </Pressable>
-            </>
-          )}
+                <Pressable
+                  disabled={!reason || submitting}
+                  onPress={handleSubmit}
+                  style={[styles.submitButton, (!reason || submitting) && styles.submitButtonDisabled]}>
+                  <ThemedText style={styles.submitButtonText}>
+                    {submitting ? 'Skickar...' : 'Skicka rapport'}
+                  </ThemedText>
+                </Pressable>
+              </>
+            )}
+          </ScrollView>
         </ThemedView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -206,7 +221,7 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    gap: Spacing.three,
+    maxHeight: '85%',
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
   },
@@ -215,12 +230,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#D5DAE2',
     borderRadius: 999,
     height: 4,
+    marginBottom: Spacing.two,
     width: 42,
+  },
+  scrollContent: {
+    gap: Spacing.three,
   },
   title: {
     fontSize: 19,
     fontWeight: '800',
-    color: '#1D2430',
   },
   optionList: {
     gap: Spacing.one,
@@ -238,7 +256,6 @@ const styles = StyleSheet.create({
   reasonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1D2430',
   },
   checkmark: {
     color: '#E39E72',

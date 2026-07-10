@@ -34,6 +34,12 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Appen behöver tillgång till dina bilder för att du ska kunna välja en profilbild."
+        }
       ]
     ],
     "experiments": {

@@ -4,7 +4,9 @@
  */
 
 import { Colors } from '@/constants/theme';
+import { useThemeMode } from '@/lib/theme-mode';
 
 export function useTheme() {
-  return Colors.light;
+  const { themeMode } = useThemeMode();
+  return Colors[themeMode];
 }

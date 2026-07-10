@@ -199,7 +199,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   headerTitle: {
-    color: '#1D2430',
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
@@ -261,7 +260,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF0FF',
   },
   roleBadgeBuyer: {
-    backgroundColor: '#FFC8A54D',
+    backgroundColor: '#FFC8A5CC',
   },
   roleBadgeText: {
     color: '#1D2430',

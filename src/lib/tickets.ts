@@ -15,6 +15,7 @@ export type Listing = {
   contactMethod: string;
   contactInfo: string;
   createdAt: Date;
+  updatedAt: Date;
   isHot?: boolean;
   isSold?: boolean;
   nationId: string;
@@ -55,12 +56,13 @@ type ListingRow = {
   contact_method: string | null;
   contact_info: string | null;
   created_at: string;
+  updated_at: string;
   nation_id: string;
   status: 'active' | 'sold' | 'archived';
 };
 
 const LISTING_COLUMNS =
-  'id,user_id,event_name,ticket_type,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,nation_id,status';
+  'id,user_id,event_name,ticket_type,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,updated_at,nation_id,status';
 
 function mapListing(row: ListingRow): Listing {
   return {
@@ -76,6 +78,7 @@ function mapListing(row: ListingRow): Listing {
     contactMethod: row.contact_method ?? '',
     contactInfo: row.contact_info ?? '',
     createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
     isSold: row.status === 'sold',
     nationId: row.nation_id,
   };
@@ -124,18 +127,24 @@ export async function fetchListingsByIds(listingIds: string[]): Promise<Listing[
   return (data ?? []).map((row) => mapListing(row as ListingRow));
 }
 
-export async function markListingSold(listing: Listing, userId: string): Promise<string> {
-  const { error } = await supabase
-    .from('listings')
-    .update({ status: 'sold' })
-    .eq('id', listing.id)
-    .eq('user_id', userId);
+export const SOLD_LISTING_KEEP_MS = 24 * 60 * 60 * 1000;
+
+export async function markListingSold(listing: Listing): Promise<string> {
+  const { error } = await supabase.rpc('mark_listing_sold', { target_listing_id: listing.id });
 
   if (error) {
     throw new Error(error.message);
   }
 
   return listing.id;
+}
+
+export async function restoreListingActive(listing: Listing): Promise<void> {
+  const { error } = await supabase.rpc('restore_listing_active', { target_listing_id: listing.id });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function deleteListing(listingId: string, userId: string): Promise<void> {

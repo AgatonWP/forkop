@@ -258,7 +258,7 @@ export default function SellScreen() {
                   <TextInput
                     value={customOrganizer}
                     onChangeText={setCustomOrganizer}
-                    placeholder="Ange arrangör, t.ex. Kårhuset"
+                    placeholder={t('organizerPlaceholder')}
                     placeholderTextColor={theme.textSecondary}
                     style={[
                       styles.textField,
@@ -319,7 +319,7 @@ export default function SellScreen() {
 
               {/* 4. Deal type */}
               <FormSection label={t('iWantTo')}>
-                <View style={styles.segment}>
+                <View style={[styles.segment, { backgroundColor: theme.backgroundSelected }]}>
                   <SegmentButton
                     label={t('sellAction')}
                     active={dealType === 'sell'}
@@ -435,7 +435,7 @@ export default function SellScreen() {
                           <TextInput
                             value={wantedCustomOrganizer}
                             onChangeText={setWantedCustomOrganizer}
-                            placeholder="Ange arrangör, t.ex. Kårhuset"
+                            placeholder={t('organizerPlaceholder')}
                             placeholderTextColor={theme.textSecondary}
                             style={[
                               styles.textField,
@@ -464,7 +464,7 @@ export default function SellScreen() {
                 <TextInput
                   value={description}
                   onChangeText={setDescription}
-                  placeholder="Berätta mer om biljetterna, var ni kan mötas..."
+                  placeholder={t('descriptionPlaceholder')}
                   placeholderTextColor={theme.textSecondary}
                   multiline
                   numberOfLines={3}
@@ -619,11 +619,15 @@ function SegmentButton({
   active: boolean;
   onPress: () => void;
 }) {
+  const theme = useTheme();
+
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.segmentButton, active && styles.segmentButtonActive]}>
-      <ThemedText style={[styles.segmentText, active && styles.segmentTextActive]}>
+      style={[styles.segmentButton, active && { backgroundColor: theme.backgroundElement }]}>
+      <ThemedText
+        style={styles.segmentText}
+        themeColor={active ? 'text' : 'textSecondary'}>
         {label}
       </ThemedText>
     </Pressable>
@@ -906,7 +910,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#1D2430',
   },
 
   scrollContent: {
@@ -926,7 +929,6 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   authNoticeTitle: {
-    color: '#1D2430',
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
@@ -984,7 +986,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1D2430',
   },
   chevron: {
     fontSize: 22,
@@ -1008,7 +1009,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     lineHeight: 22,
-    color: '#1D2430',
   },
   stepperValue: {
     alignItems: 'center',
@@ -1022,11 +1022,9 @@ const styles = StyleSheet.create({
   stepperValueText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1D2430',
   },
 
   segment: {
-    backgroundColor: '#EEF0F4',
     borderRadius: 10,
     flexDirection: 'row',
     padding: 3,
@@ -1039,17 +1037,10 @@ const styles = StyleSheet.create({
     minHeight: 40,
     paddingHorizontal: Spacing.one,
   },
-  segmentButtonActive: {
-    backgroundColor: '#FFFFFF',
-  },
   segmentText: {
-    color: '#776B63',
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  segmentTextActive: {
-    color: '#1D2430',
   },
   dealFollowUp: {
     gap: Spacing.three,
@@ -1076,7 +1067,6 @@ const styles = StyleSheet.create({
   priceSuffix: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1D2430',
     lineHeight: 18,
     width: 72,
   },
@@ -1163,7 +1153,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1D2430',
   },
   searchInput: {
     borderRadius: 10,
@@ -1188,7 +1177,6 @@ const styles = StyleSheet.create({
     minHeight: 58,
   },
   customOptionLabel: {
-    color: '#1D2430',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -1212,7 +1200,6 @@ const styles = StyleSheet.create({
   eventName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1D2430',
   },
   checkmark: {
     color: '#E39E72',
@@ -1266,7 +1253,6 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1D2430',
     lineHeight: 36,
     textAlign: 'center',
   },

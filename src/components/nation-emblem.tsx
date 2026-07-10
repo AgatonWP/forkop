@@ -16,7 +16,14 @@ const NATION_IMAGES: Record<string, ReturnType<typeof require>> = {
   kalmar: require('@/assets/images/nations/kalmar.png'),
   wermlands: require('@/assets/images/nations/wermlands.png'),
   sydskanska: require('@/assets/images/nations/sydskanska.png'),
+  mejeriet: require('@/assets/images/nations/mejeriet.png'),
+  // Placeholder image until the real Lundakarnevalen mark is available.
+  karneval: require('@/assets/images/nations/karneval.jpg'),
 };
+
+export function getNationImage(nationId: string) {
+  return NATION_IMAGES[nationId];
+}
 
 interface NationEmblemProps {
   nationId: string;

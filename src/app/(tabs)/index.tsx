@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   FlatList,
+  Image,
   Modal,
   PanResponder,
   Platform,
@@ -14,12 +15,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 
 import { ChatModal } from '@/components/chat-modal';
-import { LanguageToggle } from '@/components/language-toggle';
 import { Logo } from '@/components/logo';
-import { NationEmblem } from '@/components/nation-emblem';
+import { getNationImage } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -38,7 +39,6 @@ import {
 const TICKET_TYPE_FILTERS = [
   { id: 'Förköp', label: 'Förköp' },
   { id: 'Eftersläpp', label: 'Eftersläpp' },
-  { id: 'Annan', label: 'Annan' },
 ];
 
 const DEAL_FILTERS = [
@@ -91,6 +91,20 @@ export default function HomeScreen() {
     };
   }, [loadListings]);
 
+  // Tab screens stay mounted when you switch away, so without this the
+  // feed would go stale after posting/selling elsewhere until a full
+  // app reload.
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      loadListings(() => isActive, false);
+
+      return () => {
+        isActive = false;
+      };
+    }, [loadListings]),
+  );
+
   const refreshListings = useCallback(() => {
     setRefreshing(true);
     loadListings().finally(() => {
@@ -140,9 +154,7 @@ export default function HomeScreen() {
             },
           ]}>
           <View style={styles.headerRow}>
-            <View style={styles.headerSide}>
-              <LanguageToggle />
-            </View>
+            <View style={styles.headerSide} />
             <View style={styles.brandBlock}>
               <Logo />
             </View>
@@ -207,12 +219,12 @@ export default function HomeScreen() {
                     },
                   ]}>
                   <ThemedText
-                    style={[styles.filterToggleText, filtersOpen && styles.filterToggleTextActive]}>
+                    style={[styles.filterToggleText, { color: filtersOpen ? '#FFFFFF' : theme.text }]}>
                     {t('filter')}
                   </ThemedText>
                   {filtersActive && <View style={styles.filterDot} />}
                   <ThemedText
-                    style={[styles.filterToggleChevron, filtersOpen && styles.filterToggleTextActive]}>
+                    style={[styles.filterToggleChevron, { color: filtersOpen ? '#FFFFFF' : theme.text }]}>
                     {filtersOpen ? '︿' : '﹀'}
                   </ThemedText>
                 </Pressable>
@@ -329,15 +341,22 @@ function FilterChip({
           borderColor: active ? '#E39E7273' : theme.backgroundSelected,
         },
       ]}>
-      <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>{label}</ThemedText>
+      <ThemedText
+        style={[styles.chipText, { color: theme.textSecondary }, active && styles.chipTextActive]}>
+        {label}
+      </ThemedText>
     </Pressable>
   );
 }
 
+const FULL_COVER_WATERMARK_NATIONS = new Set(['mejeriet', 'karneval']);
+
 function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const theme = useTheme();
   const { t } = useI18n();
-  const nationName = getNation(listing.nationId).name;
+  const nation = getNation(listing.nationId);
+  const nationImage = getNationImage(listing.nationId);
+  const fullCover = FULL_COVER_WATERMARK_NATIONS.has(listing.nationId);
 
   return (
     <Pressable
@@ -350,45 +369,60 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
           opacity: pressed ? 0.72 : 1,
         },
       ]}>
-      <View style={styles.cardTopRow}>
-        <NationEmblem nationId={listing.nationId} />
-        <View style={styles.cardTitleBlock}>
-          <View style={styles.titleRow}>
-            <ThemedText numberOfLines={1} style={styles.cardTitle}>
-              {listing.ticketType}
+      <View style={styles.cardInner}>
+        {nationImage ? (
+          <Image
+            source={nationImage}
+            style={fullCover ? styles.cardWatermarkImageFull : styles.cardWatermarkImage}
+            resizeMode={fullCover ? 'cover' : 'contain'}
+          />
+        ) : (
+          <View style={styles.cardWatermarkFallback}>
+            <ThemedText style={[styles.cardWatermarkFallbackText, { color: nation.color }]}>
+              {nation.shortName}
             </ThemedText>
-            <View style={styles.quantityPill}>
-              <ThemedText style={styles.quantityText}>
-                {formatTicketQuantity(listing.quantity)} {t('pcs')}
+          </View>
+        )}
+
+        <View style={styles.cardTopRow}>
+          <View style={styles.cardTitleBlock}>
+            <View style={styles.titleRow}>
+              <ThemedText numberOfLines={1} style={styles.cardTitle}>
+                {listing.ticketType}
+              </ThemedText>
+              <View style={styles.quantityPill}>
+                <ThemedText style={styles.quantityText}>
+                  {formatTicketQuantity(listing.quantity)} {t('pcs')}
+                </ThemedText>
+              </View>
+            </View>
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              {nation.name} · {formatRelativeTime(listing.createdAt)}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.badgeRow}>
+          {(listing.dealType === 'sell' || listing.dealType === 'both') && (
+            <View style={[styles.badge, styles.sellBadge]}>
+              <ThemedText style={styles.sellBadgeText}>
+                {listing.price ? `${listing.price} ${t('perTicket')}` : t('forSale')}
               </ThemedText>
             </View>
-          </View>
-          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-            {nationName} · {formatRelativeTime(listing.createdAt)}
-          </ThemedText>
+          )}
+          {(listing.dealType === 'trade' || listing.dealType === 'both') && (
+            <View style={[styles.badge, styles.tradeBadge]}>
+              <ThemedText style={styles.tradeBadgeText} numberOfLines={1}>
+                {t('trade')}: {listing.tradeDescription ?? t('suggestion')}
+              </ThemedText>
+            </View>
+          )}
+          {listing.isHot && (
+            <View style={[styles.badge, styles.hotBadge]}>
+              <ThemedText style={styles.hotBadgeText}>{t('popular')}</ThemedText>
+            </View>
+          )}
         </View>
-      </View>
-
-      <View style={styles.badgeRow}>
-        {(listing.dealType === 'sell' || listing.dealType === 'both') && (
-          <View style={[styles.badge, styles.sellBadge]}>
-            <ThemedText style={styles.sellBadgeText}>
-              {listing.price ? `${listing.price} ${t('perTicket')}` : t('forSale')}
-            </ThemedText>
-          </View>
-        )}
-        {(listing.dealType === 'trade' || listing.dealType === 'both') && (
-          <View style={[styles.badge, styles.tradeBadge]}>
-            <ThemedText style={styles.tradeBadgeText} numberOfLines={1}>
-              {t('trade')}: {listing.tradeDescription ?? t('suggestion')}
-            </ThemedText>
-          </View>
-        )}
-        {listing.isHot && (
-          <View style={[styles.badge, styles.hotBadge]}>
-            <ThemedText style={styles.hotBadgeText}>{t('popular')}</ThemedText>
-          </View>
-        )}
       </View>
     </Pressable>
   );
@@ -551,8 +585,10 @@ function ListingModal({
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
+
   return (
-    <View style={styles.stat}>
+    <View style={[styles.stat, { backgroundColor: theme.backgroundSelected }]}>
       <ThemedText type="small" themeColor="textSecondary">
         {label}
       </ThemedText>
@@ -656,15 +692,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   filterToggleText: {
-    color: '#1D2430',
     fontSize: 13,
     fontWeight: '700',
   },
-  filterToggleTextActive: {
-    color: '#FFFFFF',
-  },
   filterToggleChevron: {
-    color: '#1D2430',
     fontSize: 11,
   },
   filterDot: {
@@ -698,7 +729,6 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   chipText: {
-    color: '#687283',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -708,12 +738,41 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 8,
     borderWidth: 1,
-    gap: Spacing.two,
-    padding: Spacing.three,
     shadowColor: '#E39E72',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 14,
+  },
+  cardInner: {
+    borderRadius: 8,
+    gap: Spacing.two,
+    overflow: 'hidden',
+    padding: Spacing.three,
+  },
+  cardWatermarkImage: {
+    bottom: -24,
+    height: 150,
+    opacity: 0.14,
+    position: 'absolute',
+    right: -24,
+    width: 150,
+  },
+  cardWatermarkImageFull: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.24,
+  },
+  cardWatermarkFallback: {
+    alignItems: 'center',
+    bottom: -46,
+    justifyContent: 'center',
+    opacity: 0.16,
+    position: 'absolute',
+    right: -28,
+  },
+  cardWatermarkFallbackText: {
+    fontSize: 110,
+    fontWeight: '900',
+    letterSpacing: -4,
   },
   cardTopRow: {
     alignItems: 'center',
@@ -738,7 +797,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   quantityPill: {
-    backgroundColor: '#FFC8A54D',
+    backgroundColor: '#FFC8A5CC',
     borderRadius: 999,
     paddingHorizontal: Spacing.two,
     paddingVertical: 4,
@@ -752,7 +811,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.one,
-    paddingLeft: 44,
   },
   badge: {
     borderRadius: 6,
@@ -843,7 +901,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   stat: {
-    backgroundColor: '#F6F7F9',
     borderRadius: 8,
     flex: 1,
     padding: Spacing.two,

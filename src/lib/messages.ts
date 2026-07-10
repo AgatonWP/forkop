@@ -26,12 +26,12 @@ type MessageRow = {
   id: string;
   conversation_id: string;
   sender_id: string;
-  text: string;
+  body: string;
   created_at: string;
 };
 
 const CONVERSATION_COLUMNS = 'id,listing_id,buyer_id,seller_id';
-const MESSAGE_COLUMNS = 'id,conversation_id,sender_id,text,created_at';
+const MESSAGE_COLUMNS = 'id,conversation_id,sender_id,body,created_at';
 
 function mapConversation(row: ConversationRow): Conversation {
   return {
@@ -45,7 +45,7 @@ function mapConversation(row: ConversationRow): Conversation {
 function mapMessage(row: MessageRow, userId: string): Message {
   return {
     id: row.id,
-    text: row.text,
+    text: row.body,
     senderId: row.sender_id,
     fromMe: row.sender_id === userId,
     sentAt: new Date(row.created_at),
@@ -153,7 +153,7 @@ export async function fetchLatestMessages(
 export async function sendMessage(conversationId: string, senderId: string, text: string): Promise<Message> {
   const { data, error } = await supabase
     .from('messages')
-    .insert({ conversation_id: conversationId, sender_id: senderId, text })
+    .insert({ conversation_id: conversationId, sender_id: senderId, body: text })
     .select(MESSAGE_COLUMNS)
     .single();
 

@@ -6,17 +6,19 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from 'expo-router/ui';
-import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+import { Pressable, View, StyleSheet } from 'react-native';
 
 import { Logo } from './logo';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
-import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
+import { useUnreadMessages } from '@/lib/unread-messages';
 
 export default function AppTabs() {
   const { t } = useI18n();
+  const { hasUnread } = useUnreadMessages();
 
   return (
     <Tabs>
@@ -30,13 +32,10 @@ export default function AppTabs() {
             <SellTabButton>+ {t('sell')}</SellTabButton>
           </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
-            <TabButton>{t('messages')}</TabButton>
+            <TabButton showDot={hasUnread}>{t('messages')}</TabButton>
           </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>{t('profile')}</TabButton>
-          </TabTrigger>
-          <TabTrigger name="settings" href="/settings" asChild>
-            <View style={styles.hiddenTabTrigger} />
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -44,7 +43,12 @@ export default function AppTabs() {
   );
 }
 
-export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+export function TabButton({
+  children,
+  isFocused,
+  showDot,
+  ...props
+}: TabTriggerSlotProps & { showDot?: boolean }) {
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView
@@ -53,6 +57,7 @@ export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps
         <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
           {children}
         </ThemedText>
+        {showDot && <View style={styles.unreadDot} />}
       </ThemedView>
     </Pressable>
   );
@@ -115,6 +120,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
   },
+  unreadDot: {
+    backgroundColor: '#C84646',
+    borderRadius: 999,
+    height: 7,
+    position: 'absolute',
+    right: 4,
+    top: 4,
+    width: 7,
+  },
   sellButtonView: {
     backgroundColor: '#1D2430',
     borderRadius: Spacing.three,
@@ -132,10 +146,5 @@ const styles = StyleSheet.create({
   },
   sellButtonTextActive: {
     color: '#FFFFFF',
-  },
-  hiddenTabTrigger: {
-    height: 0,
-    opacity: 0,
-    width: 0,
   },
 });

@@ -30,6 +30,7 @@ import {
 } from '@/lib/messages';
 import { getNation } from '@/lib/nations';
 import { Listing, formatTicketQuantity } from '@/lib/tickets';
+import { useUnreadMessages } from '@/lib/unread-messages';
 import { ReportModal } from '@/components/report-modal';
 
 type Props = {
@@ -43,6 +44,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { markConversationRead } = useUnreadMessages();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +79,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
         const msgs = await fetchMessages(conv.id, user.id);
         if (!active) return;
         setMessages(msgs);
+        markConversationRead(conv.id);
       })
       .catch((error) => {
         if (!active) return;
@@ -96,8 +99,9 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
 
     return subscribeToMessages(conversation.id, user.id, (message) => {
       setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
+      markConversationRead(conversation.id);
     });
-  }, [conversation?.id, user?.id]);
+  }, [conversation?.id, user?.id, markConversationRead]);
 
   const scrollToBottom = useCallback(() => {
     listRef.current?.scrollToEnd({ animated: true });
@@ -207,6 +211,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
           style={[
             styles.header,
             {
+              backgroundColor: theme.backgroundHeader,
               borderBottomColor: theme.backgroundSelected,
               paddingTop: insets.top + Spacing.one,
             },
@@ -385,7 +390,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
-    backgroundColor: 'rgba(255,255,255,0.94)',
   },
   backButton: {
     alignItems: 'center',
@@ -394,7 +398,6 @@ const styles = StyleSheet.create({
     width: 28,
   },
   backIcon: {
-    color: '#1D2430',
     fontSize: 30,
     fontWeight: '400',
     lineHeight: 34,
@@ -404,7 +407,6 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   headerTitle: {
-    color: '#1D2430',
     fontSize: 16,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -423,7 +425,6 @@ const styles = StyleSheet.create({
     width: 24,
   },
   moreIcon: {
-    color: '#1D2430',
     fontSize: 20,
     fontWeight: '800',
     lineHeight: 20,
@@ -467,7 +468,6 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 21,
-    color: '#1D2430',
   },
   bubbleTextMe: {
     color: '#FFFFFF',

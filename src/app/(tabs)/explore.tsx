@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LanguageToggle } from '@/components/language-toggle';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -16,10 +16,12 @@ import { useI18n } from '@/lib/i18n';
 import { getNation } from '@/lib/nations';
 import {
   Listing,
+  SOLD_LISTING_KEEP_MS,
   deleteListing,
   fetchMyListings,
   formatTicketQuantity,
   markListingSold,
+  restoreListingActive,
 } from '@/lib/tickets';
 
 export default function ProfileScreen() {
@@ -68,8 +70,25 @@ export default function ProfileScreen() {
     }
   }, [initializing, loadListings, user]);
 
+  // Tab screens stay mounted when you switch away, so without this a
+  // listing posted elsewhere (e.g. the sell flow) wouldn't show up here
+  // until the app fully reloads.
+  useFocusEffect(
+    useCallback(() => {
+      if (!initializing && user) {
+        loadListings();
+      }
+    }, [initializing, loadListings, user]),
+  );
+
   const activeListings = useMemo(() => listings.filter((listing) => !listing.isSold), [listings]);
-  const soldListings = useMemo(() => listings.filter((listing) => listing.isSold), [listings]);
+  const soldListings = useMemo(
+    () =>
+      listings.filter(
+        (listing) => listing.isSold && Date.now() - listing.updatedAt.getTime() < SOLD_LISTING_KEEP_MS,
+      ),
+    [listings],
+  );
 
   async function handleAuthSubmit() {
     if (!email.trim() || !password) return;
@@ -130,15 +149,36 @@ export default function ProfileScreen() {
     setListingsError(null);
 
     try {
-      const soldListingId = await markListingSold(listing, user.id);
+      const soldListingId = await markListingSold(listing);
       setListings((current) =>
         current.map((item) =>
-          item.id === listing.id ? { ...item, id: soldListingId, isSold: true } : item,
+          item.id === listing.id ? { ...item, id: soldListingId, isSold: true, updatedAt: new Date() } : item,
         ),
       );
       setDeleteCandidate(null);
     } catch (error) {
       setListingsError(error instanceof Error ? error.message : t('markSoldError'));
+      setDeleteCandidate(null);
+    } finally {
+      setPendingListingId(null);
+    }
+  }
+
+  async function handleRestoreListing() {
+    if (!user || !deleteCandidate || pendingListingId || !deleteCandidate.isSold) return;
+
+    const listing = deleteCandidate;
+    setPendingListingId(listing.id);
+    setListingsError(null);
+
+    try {
+      await restoreListingActive(listing);
+      setListings((current) =>
+        current.map((item) => (item.id === listing.id ? { ...item, isSold: false } : item)),
+      );
+      setDeleteCandidate(null);
+    } catch (error) {
+      setListingsError(error instanceof Error ? error.message : t('restoreListingError'));
       setDeleteCandidate(null);
     } finally {
       setPendingListingId(null);
@@ -152,14 +192,13 @@ export default function ProfileScreen() {
           <View style={styles.headerSide} />
           <ThemedText style={styles.headerTitle}>{t('profile')}</ThemedText>
           <View style={styles.headerRight}>
-            <LanguageToggle />
             {user ? (
               <Pressable
                 accessibilityLabel="Inställningar"
                 hitSlop={16}
                 onPress={() => router.push('/settings')}
                 style={({ pressed }) => [styles.settingsButton, pressed && styles.settingsButtonPressed]}>
-                <Ionicons color="#1D2430" name="settings-outline" size={22} />
+                <Ionicons color={theme.text} name="settings-outline" size={22} />
               </Pressable>
             ) : (
               <View style={styles.settingsButton} />
@@ -321,6 +360,7 @@ export default function ProfileScreen() {
         onCancel={() => setDeleteCandidate(null)}
         onDelete={handleDeleteListing}
         onMarkSold={handleMarkSold}
+        onRestore={handleRestoreListing}
       />
     </ThemedView>
   );
@@ -435,16 +475,19 @@ function ListingActionModal({
   onCancel,
   onDelete,
   onMarkSold,
+  onRestore,
 }: {
   listing: Listing | null;
   pending: boolean;
   onCancel: () => void;
   onDelete: () => void;
   onMarkSold: () => void;
+  onRestore: () => void;
 }) {
   const theme = useTheme();
   const { t } = useI18n();
   const showMarkSold = !!listing && !listing.isSold;
+  const showRestore = !!listing && listing.isSold;
 
   return (
     <Modal
@@ -465,6 +508,16 @@ function ListingActionModal({
               style={[styles.confirmButton, styles.markSoldButton, { opacity: pending ? 0.5 : 1 }]}>
               <ThemedText style={styles.markSoldButtonText}>
                 {pending ? t('wait') : t('markAsSold')}
+              </ThemedText>
+            </Pressable>
+          )}
+          {showRestore && (
+            <Pressable
+              disabled={pending}
+              onPress={onRestore}
+              style={[styles.confirmButton, styles.markSoldButton, { opacity: pending ? 0.5 : 1 }]}>
+              <ThemedText style={styles.markSoldButtonText}>
+                {pending ? t('wait') : t('restoreListing')}
               </ThemedText>
             </Pressable>
           )}
@@ -508,7 +561,6 @@ const styles = StyleSheet.create({
     width: 92,
   },
   headerTitle: {
-    color: '#1D2430',
     flex: 1,
     fontSize: 17,
     fontWeight: '800',
@@ -568,7 +620,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   profileName: {
-    color: '#1D2430',
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,
@@ -586,7 +637,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   authTitle: {
-    color: '#1D2430',
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,
@@ -631,7 +681,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outlineButtonText: {
-    color: '#1D2430',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -639,7 +688,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   sectionTitle: {
-    color: '#1D2430',
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
@@ -670,7 +718,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   listingTitle: {
-    color: '#1D2430',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 20,
@@ -734,7 +781,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   confirmTitle: {
-    color: '#1D2430',
     fontSize: 19,
     fontWeight: '800',
     lineHeight: 24,
@@ -765,7 +811,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   cancelButtonText: {
-    color: '#1D2430',
     fontSize: 14,
     fontWeight: '800',
   },

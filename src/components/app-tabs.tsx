@@ -1,14 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
+import { Badge, Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
 
 import { Colors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
+import { useThemeMode } from '@/lib/theme-mode';
+import { useUnreadMessages } from '@/lib/unread-messages';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const { themeMode } = useThemeMode();
+  const colors = Colors[themeMode];
   const { t } = useI18n();
+  const { hasUnread } = useUnreadMessages();
 
   return (
     <NativeTabs
@@ -43,6 +45,7 @@ export default function AppTabs() {
             selected: <VectorIcon family={Ionicons} name="chatbubble" />,
           }}
         />
+        <Badge hidden={!hasUnread}>{''}</Badge>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="explore">
@@ -54,8 +57,6 @@ export default function AppTabs() {
           }}
         />
       </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="settings" hidden />
     </NativeTabs>
   );
 }
