@@ -25,6 +25,7 @@ import { NATIONS_LIST, getNation } from '@/lib/nations';
 import {
   DealType,
   MORE_THAN_MAX_TICKET_QUANTITY,
+  formatListingEventDate,
   formatTicketQuantity,
 } from '@/lib/tickets';
 
@@ -37,6 +38,15 @@ const QUANTITY_OPTIONS = Array.from({ length: MORE_THAN_MAX_TICKET_QUANTITY }, (
   };
 });
 const MAX_TICKET_PRICE = 3000;
+const DATE_OPTION_DAYS = 180;
+
+function toLocalDateId(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
 
 export default function SellScreen() {
   const theme = useTheme();
@@ -48,6 +58,7 @@ export default function SellScreen() {
   const [customOrganizer, setCustomOrganizer] = useState('');
   const [ticketType, setTicketType] = useState(TICKET_TYPES[0]);
   const [customTicketType, setCustomTicketType] = useState('');
+  const [eventDate, setEventDate] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [dealType, setDealType] = useState<DealType>('sell');
   const [price, setPrice] = useState('');
@@ -59,6 +70,7 @@ export default function SellScreen() {
   const [description, setDescription] = useState('');
   const [nationPickerOpen, setNationPickerOpen] = useState(false);
   const [ticketTypePickerOpen, setTicketTypePickerOpen] = useState(false);
+  const [eventDatePickerOpen, setEventDatePickerOpen] = useState(false);
   const [quantityPickerOpen, setQuantityPickerOpen] = useState(false);
   const [wantedNationPickerOpen, setWantedNationPickerOpen] = useState(false);
   const [wantedTicketTypePickerOpen, setWantedTicketTypePickerOpen] = useState(false);
@@ -74,6 +86,25 @@ export default function SellScreen() {
     ticketType === 'Annan' && customTicketTypeName ? `Annan: ${customTicketTypeName}` : ticketType;
   const ticketTypeReady = ticketType !== 'Annan' || customTicketTypeName.length > 0;
   const eventDisplayName = organizerName ? `${organizerName} – ${effectiveTicketType}` : '';
+  const eventDateOptions = useMemo(() => {
+    const today = new Date();
+
+    return Array.from({ length: DATE_OPTION_DAYS }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() + index);
+      const id = toLocalDateId(date);
+      const formattedDate = formatListingEventDate(id, language);
+      const relativeLabel = index === 0 ? t('today') : index === 1 ? t('tomorrow') : null;
+
+      return {
+        id,
+        label: relativeLabel ? `${relativeLabel} · ${formattedDate}` : formattedDate,
+      };
+    });
+  }, [language, t]);
+  const selectedEventDateLabel = eventDate
+    ? eventDateOptions.find((option) => option.id === eventDate)?.label ?? formatListingEventDate(eventDate, language)
+    : '';
   const selectedWantedNation = wantedNationId ? getNation(wantedNationId) : null;
   const wantedOrganizerName =
     wantedNationId === 'other' ? wantedCustomOrganizer.trim() : (selectedWantedNation?.name ?? '');
@@ -94,6 +125,7 @@ export default function SellScreen() {
     !!user &&
     organizerName.length > 0 &&
     ticketTypeReady &&
+    eventDate.length > 0 &&
     tradeTargetReady &&
     (dealType === 'trade' || (numericPrice > 0 && numericPrice <= MAX_TICKET_PRICE)) &&
     !submitting;
@@ -103,6 +135,11 @@ export default function SellScreen() {
       ? language === 'sv'
         ? 'egen biljettyp'
         : 'custom ticket type'
+      : null,
+    !eventDate
+      ? language === 'sv'
+        ? 'dag/datum'
+        : 'day/date'
       : null,
     dealType !== 'trade'
       ? language === 'sv'
@@ -136,6 +173,7 @@ export default function SellScreen() {
     setCustomOrganizer('');
     setTicketType(TICKET_TYPES[0]);
     setCustomTicketType('');
+    setEventDate('');
     setQuantity(1);
     setDealType('sell');
     setPrice('');
@@ -158,6 +196,7 @@ export default function SellScreen() {
       user_id: user.id,
       event_name: eventDisplayName.trim(),
       ticket_type: effectiveTicketType,
+      event_date: eventDate,
       quantity,
       deal_type: dealType,
       price: dealType === 'trade' ? null : Number(price),
@@ -166,6 +205,7 @@ export default function SellScreen() {
       contact_method: '',
       contact_info: '',
       nation_id: nationId,
+      seller_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? null,
     });
 
     setSubmitting(false);
@@ -316,6 +356,30 @@ export default function SellScreen() {
                   </FormSection>
                 </View>
               </View>
+
+              <FormSection label={t('ticketDate')}>
+                <Pressable
+                  onPress={() => setEventDatePickerOpen(true)}
+                  style={[
+                    styles.selectButton,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: eventDate ? '#E39E7273' : theme.backgroundSelected,
+                    },
+                  ]}>
+                  <ThemedText
+                    numberOfLines={1}
+                    style={[
+                      styles.selectButtonText,
+                      !eventDate && { color: theme.textSecondary },
+                    ]}>
+                    {selectedEventDateLabel || t('chooseTicketDate')}
+                  </ThemedText>
+                  <ThemedText style={styles.chevron} themeColor="textSecondary">
+                    ›
+                  </ThemedText>
+                </Pressable>
+              </FormSection>
 
               {/* 4. Deal type */}
               <FormSection label={t('iWantTo')}>
@@ -550,6 +614,18 @@ export default function SellScreen() {
           setQuantityPickerOpen(false);
         }}
         onClose={() => setQuantityPickerOpen(false)}
+      />
+
+      <SimplePickerModal
+        visible={eventDatePickerOpen}
+        title={t('ticketDate')}
+        options={eventDateOptions}
+        selectedId={eventDate}
+        onSelect={(id) => {
+          setEventDate(id);
+          setEventDatePickerOpen(false);
+        }}
+        onClose={() => setEventDatePickerOpen(false)}
       />
 
       <SimplePickerModal

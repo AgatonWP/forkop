@@ -32,6 +32,7 @@ import { ReportModal } from '@/components/report-modal';
 import {
   Listing,
   fetchActiveListings,
+  formatListingEventDate,
   formatRelativeTime,
   formatTicketQuantity,
 } from '@/lib/tickets';
@@ -349,14 +350,18 @@ function FilterChip({
   );
 }
 
-const FULL_COVER_WATERMARK_NATIONS = new Set(['mejeriet', 'karneval']);
-
 function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const theme = useTheme();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const nation = getNation(listing.nationId);
   const nationImage = getNationImage(listing.nationId);
-  const fullCover = FULL_COVER_WATERMARK_NATIONS.has(listing.nationId);
+  const useLogoWatermark = listing.nationId === 'mejeriet';
+  const usePhotoWatermark = listing.nationId === 'karneval';
+  const listingMeta = [
+    nation.name,
+    listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
+    formatRelativeTime(listing.createdAt),
+  ].filter(Boolean).join(' · ');
 
   return (
     <Pressable
@@ -373,8 +378,14 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         {nationImage ? (
           <Image
             source={nationImage}
-            style={fullCover ? styles.cardWatermarkImageFull : styles.cardWatermarkImage}
-            resizeMode={fullCover ? 'cover' : 'contain'}
+            style={
+              useLogoWatermark
+                ? styles.cardWatermarkImageLogo
+                : usePhotoWatermark
+                  ? styles.cardWatermarkImagePhoto
+                  : styles.cardWatermarkImage
+            }
+            resizeMode={usePhotoWatermark ? 'cover' : 'contain'}
           />
         ) : (
           <View style={styles.cardWatermarkFallback}>
@@ -397,7 +408,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
               </View>
             </View>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {nation.name} · {formatRelativeTime(listing.createdAt)}
+              {listingMeta}
             </ThemedText>
           </View>
         </View>
@@ -442,7 +453,7 @@ function ListingModal({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const nationName = listing ? getNation(listing.nationId).name : '';
   const titleText = listing ? listing.ticketType : '';
@@ -538,9 +549,17 @@ function ListingModal({
                     {nationName}
                   </ThemedText>
                   <ThemedText style={styles.modalTitle}>{titleText}</ThemedText>
+                  {listing.sellerName && (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {t('postedBy')} {listing.sellerName}
+                    </ThemedText>
+                  )}
                 </View>
 
                 <View style={styles.modalStats}>
+                  {listing.eventDate && (
+                    <Stat label={t('ticketDate')} value={formatListingEventDate(listing.eventDate, language)} />
+                  )}
                   <Stat label={t('quantity')} value={`${formatTicketQuantity(listing.quantity)} ${t('pcs')}`} />
                   {(listing.dealType === 'sell' || listing.dealType === 'both') && listing.price && (
                     <Stat label={t('price')} value={`${listing.price} ${t('perTicket')}`} />
@@ -548,8 +567,12 @@ function ListingModal({
                   <Stat label={t('posted')} value={formatRelativeTime(listing.createdAt)} />
                 </View>
 
-                <ThemedText style={styles.sectionLabel}>{t('description')}</ThemedText>
-                <ThemedText style={styles.description}>{listing.description}</ThemedText>
+                {listing.description.trim().length > 0 && (
+                  <>
+                    <ThemedText style={styles.sectionLabel}>{t('description')}</ThemedText>
+                    <ThemedText style={styles.description}>{listing.description}</ThemedText>
+                  </>
+                )}
 
                 {listing.tradeDescription && (
                   <>
@@ -757,9 +780,21 @@ const styles = StyleSheet.create({
     right: -24,
     width: 150,
   },
-  cardWatermarkImageFull: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.24,
+  cardWatermarkImageLogo: {
+    bottom: -14,
+    height: 108,
+    opacity: 0.16,
+    position: 'absolute',
+    right: -8,
+    width: 216,
+  },
+  cardWatermarkImagePhoto: {
+    bottom: 0,
+    left: 0,
+    opacity: 0.08,
+    position: 'absolute',
+    right: 0,
+    top: -72,
   },
   cardWatermarkFallback: {
     alignItems: 'center',

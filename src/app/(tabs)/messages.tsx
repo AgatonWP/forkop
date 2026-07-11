@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +19,7 @@ import {
 } from '@/lib/messages';
 import { getNation } from '@/lib/nations';
 import { Listing, fetchListingsByIds, formatRelativeTime } from '@/lib/tickets';
+import { useUnreadMessages } from '@/lib/unread-messages';
 
 type InboxItem = {
   conversation: Conversation;
@@ -31,19 +33,20 @@ export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const { initializing, user } = useAuth();
   const { t } = useI18n();
+  const { unreadConversationIds, refresh: refreshUnreadMessages } = useUnreadMessages();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [openItem, setOpenItem] = useState<InboxItem | null>(null);
 
-  const loadInbox = useCallback(async () => {
+  const loadInbox = useCallback(async (isActive: () => boolean = () => true) => {
     if (!user) {
-      setItems([]);
+      if (isActive()) setItems([]);
       return;
     }
 
-    setError(null);
+    if (isActive()) setError(null);
 
     try {
       const conversations = await fetchConversationsForUser(user.id);
@@ -74,8 +77,10 @@ export default function MessagesScreen() {
           return bTime - aTime;
         });
 
+      if (!isActive()) return;
       setItems(nextItems);
     } catch (err) {
+      if (!isActive()) return;
       setError(err instanceof Error ? err.message : t('messagesFetchError'));
     }
   }, [t, user]);
@@ -88,14 +93,46 @@ export default function MessagesScreen() {
       return;
     }
 
+    let isMounted = true;
     setLoading(true);
-    loadInbox().finally(() => setLoading(false));
+    loadInbox(() => isMounted).finally(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, [initializing, user, loadInbox]);
+
+  // Tab screens stay mounted when you switch away, so refresh the inbox
+  // whenever Messages becomes visible again.
+  useFocusEffect(
+    useCallback(() => {
+      if (initializing) return;
+
+      let isActive = true;
+
+      if (user) {
+        loadInbox(() => isActive);
+        refreshUnreadMessages();
+      } else {
+        setItems([]);
+      }
+
+      return () => {
+        isActive = false;
+      };
+    }, [initializing, loadInbox, refreshUnreadMessages, user]),
+  );
 
   const refresh = useCallback(() => {
     setRefreshing(true);
     loadInbox().finally(() => setRefreshing(false));
   }, [loadInbox]);
+  const unreadConversationIdSet = useMemo(
+    () => new Set(unreadConversationIds),
+    [unreadConversationIds],
+  );
 
   return (
     <ThemedView style={styles.screen}>
@@ -122,7 +159,13 @@ export default function MessagesScreen() {
             styles.listContent,
             { paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
           ]}
-          renderItem={({ item }) => <InboxRow item={item} onPress={() => setOpenItem(item)} />}
+          renderItem={({ item }) => (
+            <InboxRow
+              item={item}
+              isUnread={unreadConversationIdSet.has(item.conversation.id)}
+              onPress={() => setOpenItem(item)}
+            />
+          )}
           ListEmptyComponent={
             (initializing || loading) ? (
               <View style={styles.centerNotice}>
@@ -149,36 +192,52 @@ export default function MessagesScreen() {
   );
 }
 
-function InboxRow({ item, onPress }: { item: InboxItem; onPress: () => void }) {
+function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: boolean; onPress: () => void }) {
   const theme = useTheme();
   const { t } = useI18n();
   const nationName = getNation(item.listing.nationId).name;
+  const previewText = item.lastMessage ? item.lastMessage.text : `${nationName} · ${t('noChatYet')}`;
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected, opacity: pressed ? 0.72 : 1 },
+        isUnread && styles.rowUnread,
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: isUnread ? '#C84646' : theme.backgroundSelected,
+          opacity: pressed ? 0.72 : 1,
+        },
       ]}>
       <NationEmblem nationId={item.listing.nationId} />
       <View style={styles.rowCopy}>
         <View style={styles.rowTitleLine}>
-          <ThemedText numberOfLines={1} style={styles.rowTitle}>
+          <ThemedText numberOfLines={1} style={[styles.rowTitle, isUnread && styles.rowTitleUnread]}>
             {item.listing.eventName}
           </ThemedText>
           <View style={[styles.roleBadge, item.isSeller ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
             <ThemedText style={styles.roleBadgeText}>{item.isSeller ? t('seller') : t('buyer')}</ThemedText>
           </View>
         </View>
-        <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-          {item.lastMessage ? item.lastMessage.text : `${nationName} · ${t('noChatYet')}`}
+        <ThemedText
+          numberOfLines={1}
+          type="small"
+          themeColor={isUnread ? 'text' : 'textSecondary'}
+          style={isUnread && styles.rowPreviewUnread}>
+          {previewText}
         </ThemedText>
       </View>
       {item.lastMessage && (
-        <ThemedText type="small" themeColor="textSecondary">
-          {formatRelativeTime(item.lastMessage.sentAt)}
-        </ThemedText>
+        <View style={styles.rowMeta}>
+          <ThemedText
+            type="small"
+            themeColor={isUnread ? 'text' : 'textSecondary'}
+            style={isUnread && styles.rowTimeUnread}>
+            {formatRelativeTime(item.lastMessage.sentAt)}
+          </ThemedText>
+          {isUnread && <View style={styles.rowUnreadDot} />}
+        </View>
       )}
     </Pressable>
   );
@@ -236,6 +295,9 @@ const styles = StyleSheet.create({
     minHeight: 68,
     padding: Spacing.two,
   },
+  rowUnread: {
+    borderWidth: 1.5,
+  },
   rowCopy: {
     flex: 1,
     gap: 2,
@@ -250,6 +312,25 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '700',
+  },
+  rowTitleUnread: {
+    fontWeight: '900',
+  },
+  rowPreviewUnread: {
+    fontWeight: '800',
+  },
+  rowMeta: {
+    alignItems: 'flex-end',
+    gap: 5,
+  },
+  rowTimeUnread: {
+    fontWeight: '800',
+  },
+  rowUnreadDot: {
+    backgroundColor: '#C84646',
+    borderRadius: 999,
+    height: 8,
+    width: 8,
   },
   roleBadge: {
     borderRadius: 999,

@@ -1,7 +1,7 @@
 # Lovable Design Reference
 
-This folder is a curated snapshot of the Lovable web app design from `tixet/Program`.
-It is included only so collaborators with access to `tixet-ny` can inspect the web
+This folder is a curated snapshot of the Lovable web app design from `forkop/Program`.
+It is included only so collaborators with access to `forkop` can inspect the web
 design and compare it with the Expo mobile app.
 
 It is not wired into the mobile app build.
@@ -21,7 +21,7 @@ It is not wired into the mobile app build.
 
 ## Included Assets
 
-- Tixet logos
+- Forkop logos
 - Nation emblems used by `NationEmblem`
 - A small set of event images referenced by the design
 

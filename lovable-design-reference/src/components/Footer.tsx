@@ -1,7 +1,7 @@
 import { Mail } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
-const CONTACT_EMAIL = "tixet.info@gmail.com";
+const CONTACT_EMAIL = "forkop.info@gmail.com";
 
 export default function Footer() {
   const { lang } = useI18n();
@@ -9,7 +9,7 @@ export default function Footer() {
   const copy =
     lang === "sv"
       ? {
-          aboutTitle: "Om TIXET",
+          aboutTitle: "Om Forkop",
           aboutText:
             "Här kan du köpa, sälja och byta biljetter till nationsevent, spex, baler och andra studentevenemang - smidigt, tryggt och enkelt.",
           contactLabel: "Kontakt",
@@ -17,7 +17,7 @@ export default function Footer() {
           rights: "Alla rättigheter förbehållna.",
         }
       : {
-          aboutTitle: "About TIXET",
+          aboutTitle: "About Forkop",
           aboutText:
             "Here you can buy, sell and trade tickets to nation events, spex, balls and other student happenings - smoothly, safely and simply.",
           contactLabel: "Contact",
@@ -49,7 +49,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-border/40">
         <div className="container py-4 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} TIXET · {copy.rights}
+          © {new Date().getFullYear()} Forkop · {copy.rights}
         </div>
       </div>
     </footer>

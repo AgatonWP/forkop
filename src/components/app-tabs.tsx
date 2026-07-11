@@ -10,7 +10,7 @@ export default function AppTabs() {
   const { themeMode } = useThemeMode();
   const colors = Colors[themeMode];
   const { t } = useI18n();
-  const { hasUnread } = useUnreadMessages();
+  const { unreadConversationCount } = useUnreadMessages();
 
   return (
     <NativeTabs
@@ -45,7 +45,9 @@ export default function AppTabs() {
             selected: <VectorIcon family={Ionicons} name="chatbubble" />,
           }}
         />
-        <Badge hidden={!hasUnread}>{''}</Badge>
+        {unreadConversationCount > 0 && (
+          <Badge>{unreadConversationCount > 9 ? '9+' : String(unreadConversationCount)}</Badge>
+        )}
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="explore">

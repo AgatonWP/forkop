@@ -43,7 +43,7 @@ export default function Header({ onCreateListing }: HeaderProps) {
         <Link to="/" className="flex items-center md:justify-self-start shrink-0">
           <img
             src={logo}
-            alt="Tixet"
+            alt="Forkop"
             className="h-10 md:h-18 w-auto max-w-[120px] md:max-w-[220px] object-contain shrink-0"
           />
         </Link>

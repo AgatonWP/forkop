@@ -18,7 +18,7 @@ import { useUnreadMessages } from '@/lib/unread-messages';
 
 export default function AppTabs() {
   const { t } = useI18n();
-  const { hasUnread } = useUnreadMessages();
+  const { unreadConversationCount } = useUnreadMessages();
 
   return (
     <Tabs>
@@ -32,7 +32,7 @@ export default function AppTabs() {
             <SellTabButton>+ {t('sell')}</SellTabButton>
           </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
-            <TabButton showDot={hasUnread}>{t('messages')}</TabButton>
+            <TabButton unreadCount={unreadConversationCount}>{t('messages')}</TabButton>
           </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>{t('profile')}</TabButton>
@@ -46,9 +46,9 @@ export default function AppTabs() {
 export function TabButton({
   children,
   isFocused,
-  showDot,
+  unreadCount = 0,
   ...props
-}: TabTriggerSlotProps & { showDot?: boolean }) {
+}: TabTriggerSlotProps & { unreadCount?: number }) {
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView
@@ -57,7 +57,11 @@ export function TabButton({
         <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
           {children}
         </ThemedText>
-        {showDot && <View style={styles.unreadDot} />}
+        {unreadCount > 0 && (
+          <View style={styles.unreadBadge}>
+            <ThemedText style={styles.unreadBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</ThemedText>
+          </View>
+        )}
       </ThemedView>
     </Pressable>
   );
@@ -120,14 +124,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
   },
-  unreadDot: {
+  unreadBadge: {
+    alignItems: 'center',
     backgroundColor: '#C84646',
     borderRadius: 999,
-    height: 7,
+    height: 17,
+    justifyContent: 'center',
+    minWidth: 17,
+    paddingHorizontal: 4,
     position: 'absolute',
-    right: 4,
-    top: 4,
-    width: 7,
+    right: -3,
+    top: -5,
+  },
+  unreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   sellButtonView: {
     backgroundColor: '#1D2430',

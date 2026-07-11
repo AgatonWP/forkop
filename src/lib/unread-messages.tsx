@@ -30,6 +30,8 @@ async function loadLastRead(): Promise<Record<string, string>> {
 
 type UnreadMessagesContextValue = {
   hasUnread: boolean;
+  unreadConversationCount: number;
+  unreadConversationIds: string[];
   refresh: () => void;
   markConversationRead: (conversationId: string) => void;
 };
@@ -38,12 +40,14 @@ const UnreadMessagesContext = createContext<UnreadMessagesContextValue | null>(n
 
 export function UnreadMessagesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadConversationIds, setUnreadConversationIds] = useState<string[]>([]);
   const lastReadRef = useRef<Record<string, string>>({});
+  const unreadConversationCount = unreadConversationIds.length;
+  const hasUnread = unreadConversationCount > 0;
 
   const refresh = useCallback(async () => {
     if (!user) {
-      setHasUnread(false);
+      setUnreadConversationIds([]);
       return;
     }
 
@@ -59,15 +63,17 @@ export function UnreadMessagesProvider({ children }: { children: ReactNode }) {
         user.id,
       );
 
-      const unread = conversations.some((conversation) => {
+      const unread = conversations.flatMap((conversation) => {
         const latest = latestByConversation.get(conversation.id);
-        if (!latest || latest.fromMe) return false;
+        if (!latest || latest.fromMe) return [];
 
         const readAt = lastRead[conversation.id];
-        return !readAt || latest.sentAt.getTime() > new Date(readAt).getTime();
+        return !readAt || latest.sentAt.getTime() > new Date(readAt).getTime()
+          ? [conversation.id]
+          : [];
       });
 
-      setHasUnread(unread);
+      setUnreadConversationIds(unread);
     } catch {
       // A failed refresh just leaves the badge in its last known state.
     }
@@ -77,6 +83,7 @@ export function UnreadMessagesProvider({ children }: { children: ReactNode }) {
     (conversationId: string) => {
       const next = { ...lastReadRef.current, [conversationId]: new Date().toISOString() };
       lastReadRef.current = next;
+      setUnreadConversationIds((current) => current.filter((id) => id !== conversationId));
       storage.setItem(STORAGE_KEY, JSON.stringify(next));
       refresh();
     },
@@ -103,8 +110,8 @@ export function UnreadMessagesProvider({ children }: { children: ReactNode }) {
   }, [user, refresh]);
 
   const value = useMemo<UnreadMessagesContextValue>(
-    () => ({ hasUnread, refresh, markConversationRead }),
-    [hasUnread, refresh, markConversationRead],
+    () => ({ hasUnread, unreadConversationCount, unreadConversationIds, refresh, markConversationRead }),
+    [hasUnread, unreadConversationCount, unreadConversationIds, refresh, markConversationRead],
   );
 
   return <UnreadMessagesContext.Provider value={value}>{children}</UnreadMessagesContext.Provider>;

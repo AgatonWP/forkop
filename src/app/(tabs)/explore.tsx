@@ -19,6 +19,7 @@ import {
   SOLD_LISTING_KEEP_MS,
   deleteListing,
   fetchMyListings,
+  formatListingEventDate,
   formatTicketQuantity,
   markListingSold,
   restoreListingActive,
@@ -29,7 +30,7 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { initializing, user, signIn, signOut, signUp } = useAuth();
   const { t } = useI18n();
-  const [email, setEmail] = useState('tixet@tixet.se');
+  const [email, setEmail] = useState('forkop@forkop.se');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [submitting, setSubmitting] = useState(false);
@@ -238,7 +239,7 @@ export default function ProfileScreen() {
                 )}
                 <View style={styles.profileCopy}>
                   <ThemedText numberOfLines={1} style={styles.profileName}>
-                    {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Tixet'}
+                    {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Forkop'}
                   </ThemedText>
                   <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
                     {user.email}
@@ -410,8 +411,13 @@ function ListingRow({
   onDelete: () => void;
 }) {
   const theme = useTheme();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const nationName = getNation(listing.nationId).name;
+  const listingMeta = [
+    nationName,
+    listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
+    `${formatTicketQuantity(listing.quantity)} ${t('pcs')}`,
+  ].filter(Boolean).join(' · ');
   const showTradeBadge = listing.dealType === 'trade' || listing.dealType === 'both';
 
   return (
@@ -431,7 +437,7 @@ function ListingRow({
           {listing.eventName}
         </ThemedText>
         <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-          {nationName} · {formatTicketQuantity(listing.quantity)} {t('pcs')}
+          {listingMeta}
         </ThemedText>
       </View>
 

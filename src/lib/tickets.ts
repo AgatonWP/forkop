@@ -7,6 +7,7 @@ export type Listing = {
   userId: string;
   eventName: string;
   ticketType: string;
+  eventDate?: string;
   quantity: number;
   dealType: DealType;
   price?: number;
@@ -48,6 +49,7 @@ type ListingRow = {
   user_id: string;
   event_name: string;
   ticket_type: string;
+  event_date: string | null;
   quantity: number;
   deal_type: DealType;
   price: number | string | null;
@@ -59,10 +61,29 @@ type ListingRow = {
   updated_at: string;
   nation_id: string;
   status: 'active' | 'sold' | 'archived';
+  seller_name: string | null;
 };
 
 const LISTING_COLUMNS =
-  'id,user_id,event_name,ticket_type,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,updated_at,nation_id,status';
+  'id,user_id,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,updated_at,nation_id,status,seller_name';
+
+export function parseListingEventDate(dateString: string) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function formatListingEventDate(dateString?: string, language: 'sv' | 'en' = 'sv') {
+  if (!dateString) return '';
+
+  const date = parseListingEventDate(dateString);
+  const locale = language === 'sv' ? 'sv-SE' : 'en-GB';
+
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
+}
 
 function mapListing(row: ListingRow): Listing {
   return {
@@ -70,6 +91,7 @@ function mapListing(row: ListingRow): Listing {
     userId: row.user_id,
     eventName: row.event_name,
     ticketType: row.ticket_type,
+    eventDate: row.event_date ?? undefined,
     quantity: row.quantity,
     dealType: row.deal_type,
     price: row.price == null ? undefined : Number(row.price),
@@ -81,6 +103,7 @@ function mapListing(row: ListingRow): Listing {
     updatedAt: new Date(row.updated_at),
     isSold: row.status === 'sold',
     nationId: row.nation_id,
+    sellerName: row.seller_name ?? undefined,
   };
 }
 

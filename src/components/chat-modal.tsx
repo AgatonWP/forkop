@@ -19,6 +19,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import {
   Conversation,
   Message,
@@ -29,7 +30,7 @@ import {
   subscribeToMessages,
 } from '@/lib/messages';
 import { getNation } from '@/lib/nations';
-import { Listing, formatTicketQuantity } from '@/lib/tickets';
+import { Listing, formatListingEventDate, formatTicketQuantity } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 import { ReportModal } from '@/components/report-modal';
 
@@ -44,6 +45,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { language } = useI18n();
   const { markConversationRead } = useUnreadMessages();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -92,7 +94,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
     return () => {
       active = false;
     };
-  }, [listing?.id, conversationId, user?.id]);
+  }, [listing?.id, conversationId, user?.id, markConversationRead]);
 
   useEffect(() => {
     if (!conversation || !user) return;
@@ -190,6 +192,11 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
   const nationName = getNation(listing.nationId).name;
   const isSeller = !!user && listing.userId === user.id;
   const subtitle = isSeller ? 'Köpare' : nationName;
+  const listingMeta = [
+    subtitle,
+    listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
+    `${formatTicketQuantity(listing.quantity)} st`,
+  ].filter(Boolean).join(' · ');
 
   return (
     <Modal
@@ -224,7 +231,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
               {listing.eventName}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {subtitle} · {formatTicketQuantity(listing.quantity)} st
+              {listingMeta}
             </ThemedText>
           </View>
           <View style={styles.headerRight}>

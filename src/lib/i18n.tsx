@@ -10,6 +10,10 @@ const translations = {
     profile: 'Profil',
     filter: 'Filtrera',
     ticketType: 'Biljettyp',
+    ticketDate: 'Dag / datum',
+    chooseTicketDate: 'Välj dag för biljetten...',
+    today: 'Idag',
+    tomorrow: 'Imorgon',
     listingType: 'Annonstyp',
     sellListing: 'Säljes',
     tradeListing: 'Bytes',
@@ -107,6 +111,7 @@ const translations = {
     pushToggleError: 'Kunde inte uppdatera push-inställningen.',
     organizerPlaceholder: 'Ange arrangör, t.ex. Kårhuset',
     descriptionPlaceholder: 'Berätta mer om biljetterna, var ni kan mötas...',
+    postedBy: 'Upplagd av',
   },
   en: {
     buy: 'Buy',
@@ -115,6 +120,10 @@ const translations = {
     profile: 'Profile',
     filter: 'Filter',
     ticketType: 'Ticket type',
+    ticketDate: 'Day / date',
+    chooseTicketDate: 'Choose ticket date...',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
     listingType: 'Listing type',
     sellListing: 'For sale',
     tradeListing: 'Trade',
@@ -212,6 +221,7 @@ const translations = {
     pushToggleError: 'Could not update push setting.',
     organizerPlaceholder: 'Enter organizer, e.g. Kårhuset',
     descriptionPlaceholder: 'Tell more about the tickets, where you can meet...',
+    postedBy: 'Posted by',
   },
 } as const;
 

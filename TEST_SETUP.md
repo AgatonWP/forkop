@@ -1,6 +1,6 @@
-# Tixetny testsetup
+# Forkop testsetup
 
-Det här är en delvis färdig testversion av Tixetny. Appen är kopplad till ett separat Supabase-projekt för test, inte gamla Lovable/Tixet.
+Det här är en delvis färdig testversion av Forkop. Appen är kopplad till ett separat Supabase-projekt för test, inte gamla Lovable/Forkop.
 
 ## Kom igång
 

@@ -21,6 +21,8 @@ const NATION_IMAGES: Record<string, ReturnType<typeof require>> = {
   karneval: require('@/assets/images/nations/karneval.jpg'),
 };
 
+const WIDE_IMAGE_NATIONS = new Set(['mejeriet', 'karneval']);
+
 export function getNationImage(nationId: string) {
   return NATION_IMAGES[nationId];
 }
@@ -33,12 +35,22 @@ interface NationEmblemProps {
 export function NationEmblem({ nationId, size = 'sm' }: NationEmblemProps) {
   const nation = getNation(nationId);
   const dim = size === 'sm' ? 36 : 48;
+  const isWideImage = WIDE_IMAGE_NATIONS.has(nationId);
+  const width = isWideImage ? (size === 'sm' ? 72 : 92) : dim;
   const image = NATION_IMAGES[nationId];
 
   if (image) {
     return (
-      <View style={[styles.container, { width: dim, height: dim, borderRadius: dim / 2 }]}>
-        <Image source={image} style={styles.image} resizeMode="contain" />
+      <View
+        style={[
+          styles.container,
+          {
+            width,
+            height: dim,
+            borderRadius: isWideImage ? 8 : dim / 2,
+          },
+        ]}>
+        <Image source={image} style={[styles.image, isWideImage && styles.wideImage]} resizeMode="contain" />
       </View>
     );
   }
@@ -63,6 +75,10 @@ const styles = StyleSheet.create({
   image: {
     width: '80%',
     height: '80%',
+  },
+  wideImage: {
+    width: '92%',
+    height: '70%',
   },
   fallback: {
     alignItems: 'center',
