@@ -27,6 +27,7 @@ import {
   MORE_THAN_MAX_TICKET_QUANTITY,
   formatListingEventDate,
   formatTicketQuantity,
+  toLocalDateId,
 } from '@/lib/tickets';
 
 const TICKET_TYPES = ['Förköp', 'Eftersläpp', 'Annan'];
@@ -39,14 +40,6 @@ const QUANTITY_OPTIONS = Array.from({ length: MORE_THAN_MAX_TICKET_QUANTITY }, (
 });
 const MAX_TICKET_PRICE = 3000;
 const DATE_OPTION_DAYS = 180;
-
-function toLocalDateId(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
 
 export default function SellScreen() {
   const theme = useTheme();
@@ -409,11 +402,12 @@ export default function SellScreen() {
                         <TextInput
                           value={price}
                           onChangeText={handlePriceChange}
-                          placeholder="150"
+                          placeholder={t('price')}
                           placeholderTextColor={theme.textSecondary}
                           keyboardType="numeric"
                           style={[
                             styles.priceInput,
+                            !price && styles.priceInputPlaceholder,
                             {
                               backgroundColor: theme.backgroundElement,
                               borderColor: theme.backgroundSelected,
@@ -1139,6 +1133,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     minHeight: 50,
     paddingHorizontal: Spacing.three,
+  },
+  priceInputPlaceholder: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   priceSuffix: {
     fontSize: 13,

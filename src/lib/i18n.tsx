@@ -10,7 +10,7 @@ const translations = {
     profile: 'Profil',
     filter: 'Filtrera',
     ticketType: 'Biljettyp',
-    ticketDate: 'Dag / datum',
+    ticketDate:'Datum',
     chooseTicketDate: 'Välj dag för biljetten...',
     today: 'Idag',
     tomorrow: 'Imorgon',
@@ -29,7 +29,7 @@ const translations = {
     contactSeller: 'Kontakta säljaren',
     reportListing: 'Rapportera annons',
     quantity: 'Antal',
-    price: 'Pris',
+    price: 'Ange pris...',
     posted: 'Upplagd',
     description: 'Beskrivning',
     tradeWant: 'Vill byta mot',
@@ -112,6 +112,15 @@ const translations = {
     organizerPlaceholder: 'Ange arrangör, t.ex. Kårhuset',
     descriptionPlaceholder: 'Berätta mer om biljetterna, var ni kan mötas...',
     postedBy: 'Upplagd av',
+    allDays: 'Alla dagar',
+    daysSelected: 'dagar valda',
+    clearDates: 'Rensa',
+    done: 'Klar',
+    all: 'Alla',
+    nationLabel: 'Nation',
+    ticketTypeShortLabel: 'Biljett',
+    dealTypeShortLabel: 'Typ',
+    dateLabel: 'Datum',
   },
   en: {
     buy: 'Buy',
@@ -222,10 +231,19 @@ const translations = {
     organizerPlaceholder: 'Enter organizer, e.g. Kårhuset',
     descriptionPlaceholder: 'Tell more about the tickets, where you can meet...',
     postedBy: 'Posted by',
+    allDays: 'All days',
+    daysSelected: 'days selected',
+    clearDates: 'Clear',
+    done: 'Done',
+    all: 'All',
+    nationLabel: 'Nation',
+    ticketTypeShortLabel: 'Ticket',
+    dealTypeShortLabel: 'Type',
+    dateLabel: 'Date',
   },
 } as const;
 
-type TranslationKey = keyof typeof translations.sv;
+export type TranslationKey = keyof typeof translations.sv;
 
 type I18nContextValue = {
   language: Language;

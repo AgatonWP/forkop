@@ -72,6 +72,23 @@ export function parseListingEventDate(dateString: string) {
   return new Date(year, month - 1, day);
 }
 
+export function toLocalDateId(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+export function daysFromToday(dateString: string) {
+  const eventDate = parseListingEventDate(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  eventDate.setHours(0, 0, 0, 0);
+
+  return Math.round((eventDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+}
+
 export function formatListingEventDate(dateString?: string, language: 'sv' | 'en' = 'sv') {
   if (!dateString) return '';
 
