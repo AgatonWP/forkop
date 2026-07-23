@@ -238,9 +238,19 @@ export default function ProfileScreen() {
                   </View>
                 )}
                 <View style={styles.profileCopy}>
-                  <ThemedText numberOfLines={1} style={styles.profileName}>
-                    {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Forkop'}
-                  </ThemedText>
+                  <View style={styles.profileNameRow}>
+                    <ThemedText numberOfLines={1} style={styles.profileName}>
+                      {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Forkop'}
+                    </ThemedText>
+                    {user.user_metadata?.student_verified === true && (
+                      <Ionicons
+                        accessibilityLabel={t('verifiedStudentLabel')}
+                        color="#4F6FB7"
+                        name="checkmark-circle"
+                        size={16}
+                      />
+                    )}
+                  </View>
                   <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
                     {user.email}
                   </ThemedText>
@@ -625,7 +635,13 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  profileNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.half,
+  },
   profileName: {
+    flexShrink: 1,
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,

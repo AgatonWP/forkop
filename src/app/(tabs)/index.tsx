@@ -18,6 +18,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ChatModal } from '@/components/chat-modal';
 import { Logo } from '@/components/logo';
@@ -882,9 +883,19 @@ function ListingModal({
                   </ThemedText>
                   <ThemedText style={styles.modalTitle}>{titleText}</ThemedText>
                   {listing.sellerName && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {t('postedBy')} {listing.sellerName}
-                    </ThemedText>
+                    <View style={styles.sellerRow}>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {t('postedBy')} {listing.sellerName}
+                      </ThemedText>
+                      {listing.sellerVerified && (
+                        <Ionicons
+                          accessibilityLabel={t('verifiedStudentLabel')}
+                          color="#4F6FB7"
+                          name="checkmark-circle"
+                          size={14}
+                        />
+                      )}
+                    </View>
                   )}
                 </View>
 
@@ -1366,6 +1377,11 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     gap: 2,
+  },
+  sellerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.half,
   },
   modalTitle: {
     fontSize: 28,

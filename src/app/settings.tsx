@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ import { pickAndUploadAvatar } from '@/lib/avatar';
 import { useAuth } from '@/lib/auth';
 import { Language, useI18n } from '@/lib/i18n';
 import { disablePushNotifications, getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
+import { LU_STUDENT_EMAIL_REGEX, requestStudentVerification, verifyStudentCode } from '@/lib/student-verification';
 import { supabase } from '@/lib/supabase';
 import { ThemeMode, useThemeMode } from '@/lib/theme-mode';
 
@@ -35,6 +37,24 @@ export default function SettingsScreen() {
   const [pushLoading, setPushLoading] = useState(true);
   const [pushSubmitting, setPushSubmitting] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
+
+  const isStudentVerified = user?.user_metadata?.student_verified === true;
+  const verifiedEmail = user?.user_metadata?.student_verified_email as string | undefined;
+  const [verificationStep, setVerificationStep] = useState<'email' | 'code'>('email');
+  const [luEmail, setLuEmail] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+  const [sendCodeError, setSendCodeError] = useState<string | null>(null);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [verifyCodeError, setVerifyCodeError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => setResendCooldown((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     setAvatarUrl(user?.user_metadata?.avatar_url ?? null);
@@ -83,6 +103,49 @@ export default function SettingsScreen() {
     } finally {
       setNameSaving(false);
     }
+  }
+
+  async function handleSendVerificationCode() {
+    const trimmedEmail = luEmail.trim();
+    if (sendingCode || resendCooldown > 0 || !LU_STUDENT_EMAIL_REGEX.test(trimmedEmail)) return;
+
+    setSendingCode(true);
+    setSendCodeError(null);
+
+    try {
+      await requestStudentVerification(trimmedEmail);
+      setPendingEmail(trimmedEmail);
+      setVerificationCode('');
+      setVerifyCodeError(null);
+      setVerificationStep('code');
+      setResendCooldown(60);
+    } catch (error) {
+      setSendCodeError(error instanceof Error ? error.message : t('verificationGenericError'));
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
+  async function handleVerifyCode() {
+    const trimmedCode = verificationCode.trim();
+    if (verifyingCode || trimmedCode.length !== 6) return;
+
+    setVerifyingCode(true);
+    setVerifyCodeError(null);
+
+    try {
+      await verifyStudentCode(trimmedCode);
+    } catch (error) {
+      setVerifyCodeError(error instanceof Error ? error.message : t('verificationGenericError'));
+    } finally {
+      setVerifyingCode(false);
+    }
+  }
+
+  function handleUseDifferentEmail() {
+    setVerificationStep('email');
+    setVerificationCode('');
+    setVerifyCodeError(null);
   }
 
   async function handleTogglePush(next: boolean) {
@@ -185,6 +248,110 @@ export default function SettingsScreen() {
                 </View>
                 {nameError && <ThemedText style={styles.errorText}>{nameError}</ThemedText>}
               </View>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>{t('studentVerificationSection')}</ThemedText>
+
+            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+              {isStudentVerified ? (
+                <View style={styles.verifiedRow}>
+                  <Ionicons color="#4F6FB7" name="checkmark-circle" size={22} />
+                  <View style={styles.avatarCopy}>
+                    <ThemedText style={styles.switchTitle}>{t('verifiedStudentLabel')}</ThemedText>
+                    {verifiedEmail && (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {verifiedEmail}
+                      </ThemedText>
+                    )}
+                  </View>
+                </View>
+              ) : verificationStep === 'email' ? (
+                <>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('studentVerificationCopy')}
+                  </ThemedText>
+                  <View style={styles.nameInputRow}>
+                    <TextInput
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      onChangeText={(text) => {
+                        setLuEmail(text);
+                        setSendCodeError(null);
+                      }}
+                      placeholder={t('luEmailPlaceholder')}
+                      placeholderTextColor={theme.textSecondary}
+                      style={[
+                        styles.input,
+                        styles.nameInput,
+                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      ]}
+                      value={luEmail}
+                    />
+                    <Pressable
+                      disabled={sendingCode || resendCooldown > 0 || !LU_STUDENT_EMAIL_REGEX.test(luEmail.trim())}
+                      onPress={handleSendVerificationCode}
+                      style={[
+                        styles.saveButton,
+                        {
+                          opacity:
+                            sendingCode || resendCooldown > 0 || !LU_STUDENT_EMAIL_REGEX.test(luEmail.trim())
+                              ? 0.55
+                              : 1,
+                        },
+                      ]}>
+                      <ThemedText style={styles.saveButtonText}>
+                        {sendingCode
+                          ? t('sendingLabel')
+                          : resendCooldown > 0
+                            ? `${t('resendCodeLabel')} (${resendCooldown}s)`
+                            : t('sendCodeButton')}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                  {sendCodeError && <ThemedText style={styles.errorText}>{sendCodeError}</ThemedText>}
+                </>
+              ) : (
+                <>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('codeSentNotice')} {pendingEmail}
+                  </ThemedText>
+                  <View style={styles.nameInputRow}>
+                    <TextInput
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      onChangeText={(text) => {
+                        setVerificationCode(text.replace(/[^0-9]/g, ''));
+                        setVerifyCodeError(null);
+                      }}
+                      placeholder={t('codePlaceholder')}
+                      placeholderTextColor={theme.textSecondary}
+                      style={[
+                        styles.input,
+                        styles.nameInput,
+                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      ]}
+                      value={verificationCode}
+                    />
+                    <Pressable
+                      disabled={verifyingCode || verificationCode.trim().length !== 6}
+                      onPress={handleVerifyCode}
+                      style={[
+                        styles.saveButton,
+                        { opacity: verifyingCode || verificationCode.trim().length !== 6 ? 0.55 : 1 },
+                      ]}>
+                      <ThemedText style={styles.saveButtonText}>
+                        {verifyingCode ? t('verifyingLabel') : t('verifyCodeButton')}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                  {verifyCodeError && <ThemedText style={styles.errorText}>{verifyCodeError}</ThemedText>}
+                  <Pressable disabled={sendingCode} onPress={handleUseDifferentEmail}>
+                    <ThemedText style={styles.avatarAction}>{t('useDifferentEmailLabel')}</ThemedText>
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
 
@@ -419,6 +586,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  verifiedRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.three,
   },
   switchRow: {
     alignItems: 'center',

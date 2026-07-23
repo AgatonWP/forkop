@@ -19,6 +19,7 @@
   ],
   "exclude": [
     "lovable-design-reference",
+    "supabase/functions",
     "dist",
     "node_modules"
   ]
