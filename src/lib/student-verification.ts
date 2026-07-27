@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
-export const LU_STUDENT_EMAIL_REGEX = /^[^\s@]+@lu\.se$/i;
+export const LU_STUDENT_EMAIL_REGEX =
+  /^[^\s@]+@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*lu\.se$/i;
 
 export async function requestStudentVerification(luEmail: string): Promise<void> {
   const { data: code, error: rpcError } = await supabase.rpc('request_student_verification', {

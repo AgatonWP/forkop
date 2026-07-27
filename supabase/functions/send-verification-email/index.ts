@@ -7,7 +7,8 @@
 // own Resend account email for testing.
 import { corsHeaders } from '../_shared/cors.ts';
 
-const LU_STUDENT_EMAIL_REGEX = /^[^\s@]+@lu\.se$/i;
+const LU_STUDENT_EMAIL_REGEX =
+  /^[^\s@]+@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*lu\.se$/i;
 const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Forkop <onboarding@resend.dev>';
 
 Deno.serve(async (req) => {
@@ -19,7 +20,7 @@ Deno.serve(async (req) => {
     const { email, code } = await req.json();
 
     if (typeof email !== 'string' || !LU_STUDENT_EMAIL_REGEX.test(email)) {
-      return new Response(JSON.stringify({ error: 'Ogiltig @lu.se-mejladress.' }), {
+      return new Response(JSON.stringify({ error: 'Ogiltig LU-mejladress.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
