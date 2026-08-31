@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.agatonwp.forkop",
       "config": {
         "usesNonExemptEncryption": false

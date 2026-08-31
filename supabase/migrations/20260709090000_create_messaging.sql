@@ -57,7 +57,7 @@ create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations (id) on delete cascade,
   sender_id uuid not null references auth.users (id) on delete cascade,
-  text text not null check (char_length(btrim(text)) between 1 and 2000),
+  body text not null check (char_length(btrim(body)) between 1 and 2000),
   created_at timestamptz not null default now()
 );
 

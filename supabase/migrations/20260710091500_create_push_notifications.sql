@@ -65,7 +65,7 @@ begin
     body := jsonb_build_object(
       'to', recipient_token,
       'title', coalesce(sender_name, 'Nytt meddelande'),
-      'body', left(new.text, 120),
+      'body', left(new.body, 120),
       'data', jsonb_build_object('conversationId', new.conversation_id)
     )
   );
