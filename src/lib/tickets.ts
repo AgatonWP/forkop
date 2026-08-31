@@ -1,3 +1,4 @@
+import { getNation } from '@/lib/nations';
 import { supabase } from '@/lib/supabase';
 
 export type DealType = 'sell' | 'trade' | 'both';
@@ -36,6 +37,22 @@ export function formatRelativeTime(date: Date) {
 
   const days = Math.round(hours / 24);
   return `${days} d sedan`;
+}
+
+/**
+ * The organizer's display name for a listing. For known nations/sections this
+ * is just their name; for a custom ("Annat") organizer, nationId alone only
+ * resolves to the generic placeholder "Annat", so the real free-text name
+ * (baked into eventName as "<organizer> – <ticketType>" at post time) is
+ * recovered from there instead.
+ */
+export function getListingOrganizerName(listing: Listing) {
+  if (listing.nationId !== 'other') {
+    return getNation(listing.nationId).name;
+  }
+
+  const separatorIndex = listing.eventName.indexOf(' – ');
+  return separatorIndex === -1 ? listing.eventName : listing.eventName.slice(0, separatorIndex);
 }
 
 export function formatTicketQuantity(quantity: number) {
@@ -193,6 +210,28 @@ export async function deleteListing(listingId: string, userId: string): Promise<
     .delete()
     .eq('id', listingId)
     .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Admin-only: relies on the "Admins can view/delete any listing" RLS policies. */
+export async function fetchAllListingsAdmin(): Promise<Listing[]> {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(LISTING_COLUMNS)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => mapListing(row as ListingRow));
+}
+
+export async function adminDeleteListing(listingId: string): Promise<void> {
+  const { error } = await supabase.from('listings').delete().eq('id', listingId);
 
   if (error) {
     throw new Error(error.message);

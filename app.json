@@ -7,9 +7,19 @@
     "icon": "./assets/images/icon.png",
     "scheme": "forkop",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.agatonwp.forkop"
+      "bundleIdentifier": "com.agatonwp.forkop",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "swish"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,10 +28,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
@@ -42,9 +49,13 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Appen behöver tillgång till dina bilder för att du ska kunna välja en profilbild."
+          "photosPermission": "Appen behöver tillgång till dina bilder för att du ska kunna välja en profilbild.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
-      ]
+      ],
+      "./plugins/with-fmt-xcode26-fix",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -53,8 +64,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6eec634a-f67d-4254-9a15-15974321615b"
+        "projectId": "72d048eb-2907-4d62-aa93-c2e57b09b1f1"
       }
-    }
+    },
+    "owner": "agatonwp"
   }
 }

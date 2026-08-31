@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
   Keyboard,
+  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -14,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -29,10 +32,12 @@ import {
   sendMessage,
   subscribeToMessages,
 } from '@/lib/messages';
-import { getNation } from '@/lib/nations';
+import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
 import { Listing, formatListingEventDate, formatTicketQuantity } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 import { ReportModal } from '@/components/report-modal';
+import { blockUser, getBlockStatus, unblockUser } from '@/lib/blocking';
+import { fetchSellerSwishNumber } from '@/lib/payment-details';
 
 type Props = {
   listing: Listing | null;
@@ -45,7 +50,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const { markConversationRead } = useUnreadMessages();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -56,12 +61,38 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
+  const [swishNumberCopied, setSwishNumberCopied] = useState(false);
+  const [sellerSwishNumber, setSellerSwishNumber] = useState<string | null>(null);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [interactionBlocked, setInteractionBlocked] = useState(false);
+  const [blockSubmitting, setBlockSubmitting] = useState(false);
   const listRef = useRef<FlatList>(null);
   const screenTranslateX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     screenTranslateX.setValue(0);
   }, [listing?.id, screenTranslateX]);
+
+  useEffect(() => {
+    if (!listing) {
+      setRatingSummary(null);
+      return;
+    }
+
+    let active = true;
+    fetchRatingSummary(listing.userId)
+      .then((summary) => {
+        if (active) setRatingSummary(summary.count > 0 ? summary : null);
+      })
+      .catch(() => {
+        if (active) setRatingSummary(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [listing]);
 
   useEffect(() => {
     if (!listing || !user) return;
@@ -72,7 +103,9 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
     setConversation(null);
     setMessages([]);
 
-    const load = conversationId ? fetchConversation(conversationId) : getOrCreateConversation(listing.id, user.id);
+    const load = conversationId
+      ? fetchConversation(conversationId)
+      : getOrCreateConversation(listing.id, user.id, user.user_metadata?.full_name ?? user.email?.split('@')[0]);
 
     load
       .then(async (conv) => {
@@ -94,7 +127,40 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
     return () => {
       active = false;
     };
-  }, [listing?.id, conversationId, user?.id, markConversationRead]);
+  }, [listing, conversationId, user, markConversationRead]);
+
+  useEffect(() => {
+    if (!conversation || !user) {
+      setSellerSwishNumber(null);
+      setBlockedByMe(false);
+      setInteractionBlocked(false);
+      return;
+    }
+
+    let active = true;
+    const otherUserId = conversation.sellerId === user.id ? conversation.buyerId : conversation.sellerId;
+
+    Promise.all([
+      getBlockStatus(otherUserId),
+      conversation.sellerId === user.id
+        ? Promise.resolve(null)
+        : fetchSellerSwishNumber(conversation.sellerId),
+    ])
+      .then(([blockStatus, swishNumber]) => {
+        if (!active) return;
+        setBlockedByMe(blockStatus.blockedByMe);
+        setInteractionBlocked(blockStatus.interactionBlocked);
+        setSellerSwishNumber(swishNumber);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSellerSwishNumber(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [conversation, user]);
 
   useEffect(() => {
     if (!conversation || !user) return;
@@ -103,7 +169,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
       setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
       markConversationRead(conversation.id);
     });
-  }, [conversation?.id, user?.id, markConversationRead]);
+  }, [conversation, user, markConversationRead]);
 
   const scrollToBottom = useCallback(() => {
     listRef.current?.scrollToEnd({ animated: true });
@@ -144,6 +210,79 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
       setSending(false);
     }
   }, [conversation, user, draft, sending]);
+
+  const handleCopySwishNumber = useCallback(async () => {
+    if (!sellerSwishNumber) return;
+
+    await Clipboard.setStringAsync(sellerSwishNumber);
+    setSwishNumberCopied(true);
+    setTimeout(() => setSwishNumberCopied(false), 1500);
+  }, [sellerSwishNumber]);
+
+  const handleToggleBlock = useCallback(async () => {
+    if (!conversation || !user || blockSubmitting) return;
+
+    const otherUserId = conversation.sellerId === user.id ? conversation.buyerId : conversation.sellerId;
+    setBlockSubmitting(true);
+    setSendError(null);
+
+    try {
+      if (blockedByMe) {
+        await unblockUser(user.id, otherUserId);
+        const status = await getBlockStatus(otherUserId);
+        setBlockedByMe(status.blockedByMe);
+        setInteractionBlocked(status.interactionBlocked);
+      } else {
+        await blockUser(user.id, otherUserId);
+        setBlockedByMe(true);
+        setInteractionBlocked(true);
+      }
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : t('blockUserError'));
+    } finally {
+      setBlockSubmitting(false);
+    }
+  }, [blockedByMe, blockSubmitting, conversation, t, user]);
+
+  const openSafetyMenu = useCallback(() => {
+    if (!conversation || !user) {
+      setReportOpen(true);
+      return;
+    }
+
+    Alert.alert(t('safetyActions'), undefined, [
+      { text: t('reportUser'), onPress: () => setReportOpen(true) },
+      {
+        text: blockedByMe ? t('unblockUser') : t('blockUser'),
+        style: blockedByMe ? 'default' : 'destructive',
+        onPress: () => {
+          if (blockedByMe) {
+            handleToggleBlock();
+            return;
+          }
+
+          Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('blockUser'), style: 'destructive', onPress: handleToggleBlock },
+          ]);
+        },
+      },
+      { text: t('cancel'), style: 'cancel' },
+    ]);
+  }, [blockedByMe, conversation, handleToggleBlock, t, user]);
+
+  const handleOpenSwish = useCallback(async () => {
+    try {
+      const supported = await Linking.canOpenURL('swish://');
+      if (!supported) {
+        Alert.alert(t('swishSectionTitle'), t('swishNotInstalled'));
+        return;
+      }
+      await Linking.openURL('swish://');
+    } catch {
+      Alert.alert(t('swishSectionTitle'), t('swishOpenError'));
+    }
+  }, [t]);
 
   const closeFromSwipe = useCallback(() => {
     Animated.timing(screenTranslateX, {
@@ -189,11 +328,10 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
 
   if (!listing) return null;
 
-  const nationName = getNation(listing.nationId).name;
   const isSeller = !!user && listing.userId === user.id;
-  const subtitle = isSeller ? 'Köpare' : nationName;
+  const otherPartyName = isSeller ? (conversation?.buyerName ?? t('buyer')) : (listing.sellerName ?? t('seller'));
   const listingMeta = [
-    subtitle,
+    listing.eventName,
     listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
     `${formatTicketQuantity(listing.quantity)} st`,
   ].filter(Boolean).join(' · ');
@@ -228,22 +366,61 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
           </Pressable>
           <View style={styles.headerCenter}>
             <ThemedText numberOfLines={1} style={styles.headerTitle}>
-              {listing.eventName}
+              {otherPartyName}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              {listingMeta}
-            </ThemedText>
+            <View style={styles.headerMetaRow}>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.headerMetaText}>
+                {listingMeta}
+              </ThemedText>
+              {!isSeller && ratingSummary && (
+                <View style={styles.sellerRatingBadge}>
+                  <ThemedText
+                    style={[
+                      styles.sellerRatingEmoji,
+                      { transform: [{ rotate: `${-(5 - Math.round(ratingSummary.average)) * 45}deg` }] },
+                    ]}>
+                    👍
+                  </ThemedText>
+                  <ThemedText style={styles.sellerRatingCount}>({ratingSummary.count})</ThemedText>
+                </View>
+              )}
+            </View>
           </View>
           <View style={styles.headerRight}>
             <Pressable
               accessibilityLabel="Rapportera"
+              disabled={blockSubmitting}
               hitSlop={8}
-              onPress={() => setReportOpen(true)}
+              onPress={openSafetyMenu}
               style={styles.moreButton}>
               <ThemedText style={styles.moreIcon}>⋯</ThemedText>
             </Pressable>
           </View>
         </View>
+
+        {!isSeller && sellerSwishNumber && !interactionBlocked && (
+          <View style={[styles.swishBar, { backgroundColor: theme.backgroundElement, borderBottomColor: theme.backgroundSelected }]}>
+            <Pressable
+              onPress={handleCopySwishNumber}
+              style={({ pressed }) => [
+                styles.swishActionButton,
+                { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+              ]}>
+              <ThemedText style={styles.swishActionButtonText}>
+                {swishNumberCopied ? t('copiedLabel') : t('copyNumber')}
+              </ThemedText>
+            </Pressable>
+            <View style={[styles.swishActionDivider, { backgroundColor: theme.backgroundSelected }]} />
+            <Pressable
+              onPress={handleOpenSwish}
+              style={({ pressed }) => [
+                styles.swishActionButton,
+                { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+              ]}>
+              <ThemedText style={styles.swishActionButtonText}>{t('openSwishApp')}</ThemedText>
+            </Pressable>
+          </View>
+        )}
 
         {/* Messages */}
         <View style={styles.flex}>
@@ -293,7 +470,24 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
           )}
 
           {/* Input bar */}
-          {user && !loading && !loadError && (
+          {user && !loading && !loadError && interactionBlocked && (
+            <View
+              style={[
+                styles.blockedNotice,
+                { backgroundColor: theme.backgroundElement, borderTopColor: theme.backgroundSelected },
+              ]}>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.blockedNoticeText}>
+                {t('blockedConversation')}
+              </ThemedText>
+              {blockedByMe && (
+                <Pressable disabled={blockSubmitting} onPress={handleToggleBlock}>
+                  <ThemedText style={styles.unblockAction}>{t('unblockUser')}</ThemedText>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {user && !loading && !loadError && !interactionBlocked && (
             <View
               style={[
                 styles.inputBar,
@@ -413,6 +607,27 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 1,
   },
+  headerMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  headerMetaText: {
+    flexShrink: 1,
+  },
+  sellerRatingBadge: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  sellerRatingEmoji: {
+    fontSize: 12,
+  },
+  sellerRatingCount: {
+    color: '#9AA3B2',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   headerTitle: {
     fontSize: 16,
     fontWeight: '800',
@@ -435,6 +650,30 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     lineHeight: 20,
+  },
+
+  swishBar: {
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.one,
+  },
+  swishActionButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 38,
+  },
+  swishActionButtonText: {
+    color: '#4F6FB7',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  swishActionDivider: {
+    height: 20,
+    width: StyleSheet.hairlineWidth,
   },
 
   centerNotice: {
@@ -496,6 +735,26 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  blockedNotice: {
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    bottom: 0,
+    gap: Spacing.one,
+    left: 0,
+    paddingBottom: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    position: 'absolute',
+    right: 0,
+  },
+  blockedNoticeText: {
+    textAlign: 'center',
+  },
+  unblockAction: {
+    color: '#4F6FB7',
+    fontSize: 13,
+    fontWeight: '800',
   },
   inputRow: {
     alignItems: 'flex-end',

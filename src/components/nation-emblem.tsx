@@ -19,6 +19,15 @@ const NATION_IMAGES: Record<string, ReturnType<typeof require>> = {
   mejeriet: require('@/assets/images/nations/mejeriet.png'),
   // Placeholder image until the real Lundakarnevalen mark is available.
   karneval: require('@/assets/images/nations/karneval.jpg'),
+  'f-sektionen': require('@/assets/images/sections/f.png'),
+  'd-sektionen': require('@/assets/images/sections/d.png'),
+  'i-sektionen': require('@/assets/images/sections/i.png'),
+  'v-sektionen': require('@/assets/images/sections/v.png'),
+  'k-sektionen': require('@/assets/images/sections/k.png'),
+  'a-sektionen': require('@/assets/images/sections/a.png'),
+  'w-sektionen': require('@/assets/images/sections/w.png'),
+  'e-sektionen': require('@/assets/images/sections/e.png'),
+  maskinsektionen: require('@/assets/images/sections/maskin.png'),
 };
 
 const WIDE_IMAGE_NATIONS = new Set(['mejeriet', 'karneval']);

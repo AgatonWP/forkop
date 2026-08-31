@@ -17,7 +17,6 @@ import {
   fetchConversationsForUser,
   fetchLatestMessages,
 } from '@/lib/messages';
-import { getNation } from '@/lib/nations';
 import { Listing, fetchListingsByIds, formatRelativeTime } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 
@@ -72,8 +71,8 @@ export default function MessagesScreen() {
         })
         .filter((item): item is InboxItem => item !== null)
         .sort((a, b) => {
-          const aTime = a.lastMessage?.sentAt.getTime() ?? Number.POSITIVE_INFINITY;
-          const bTime = b.lastMessage?.sentAt.getTime() ?? Number.POSITIVE_INFINITY;
+          const aTime = a.lastMessage?.sentAt.getTime() ?? a.conversation.createdAt.getTime();
+          const bTime = b.lastMessage?.sentAt.getTime() ?? b.conversation.createdAt.getTime();
           return bTime - aTime;
         });
 
@@ -103,6 +102,15 @@ export default function MessagesScreen() {
       isMounted = false;
     };
   }, [initializing, user, loadInbox]);
+
+  // unreadConversationIds changes whenever a new message arrives anywhere (or
+  // gets marked read), via the global realtime subscription in
+  // UnreadMessagesProvider. Reloading here keeps the inbox order live while
+  // this screen stays open, instead of only on mount/focus.
+  useEffect(() => {
+    if (initializing || !user) return;
+    loadInbox();
+  }, [unreadConversationIds, initializing, user, loadInbox]);
 
   // Tab screens stay mounted when you switch away, so refresh the inbox
   // whenever Messages becomes visible again.
@@ -195,8 +203,10 @@ export default function MessagesScreen() {
 function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: boolean; onPress: () => void }) {
   const theme = useTheme();
   const { t } = useI18n();
-  const nationName = getNation(item.listing.nationId).name;
-  const previewText = item.lastMessage ? item.lastMessage.text : `${nationName} · ${t('noChatYet')}`;
+  const otherPartyName = item.isSeller ? (item.conversation.buyerName ?? t('buyer')) : (item.listing.sellerName ?? t('seller'));
+  const previewText = item.lastMessage
+    ? `${item.listing.eventName} · ${item.lastMessage.text}`
+    : `${item.listing.eventName} · ${t('noChatYet')}`;
 
   return (
     <Pressable
@@ -214,7 +224,7 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
       <View style={styles.rowCopy}>
         <View style={styles.rowTitleLine}>
           <ThemedText numberOfLines={1} style={[styles.rowTitle, isUnread && styles.rowTitleUnread]}>
-            {item.listing.eventName}
+            {otherPartyName}
           </ThemedText>
           <View style={[styles.roleBadge, item.isSeller ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
             <ThemedText style={styles.roleBadgeText}>{item.isSeller ? t('seller') : t('buyer')}</ThemedText>

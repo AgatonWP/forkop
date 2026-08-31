@@ -13,6 +13,8 @@ export type Conversation = {
   listingId: string;
   buyerId: string;
   sellerId: string;
+  buyerName?: string;
+  createdAt: Date;
 };
 
 type ConversationRow = {
@@ -20,6 +22,8 @@ type ConversationRow = {
   listing_id: string;
   buyer_id: string;
   seller_id: string;
+  buyer_name: string | null;
+  created_at: string;
 };
 
 type MessageRow = {
@@ -30,7 +34,7 @@ type MessageRow = {
   created_at: string;
 };
 
-const CONVERSATION_COLUMNS = 'id,listing_id,buyer_id,seller_id';
+const CONVERSATION_COLUMNS = 'id,listing_id,buyer_id,seller_id,buyer_name,created_at';
 const MESSAGE_COLUMNS = 'id,conversation_id,sender_id,body,created_at';
 
 function mapConversation(row: ConversationRow): Conversation {
@@ -39,6 +43,8 @@ function mapConversation(row: ConversationRow): Conversation {
     listingId: row.listing_id,
     buyerId: row.buyer_id,
     sellerId: row.seller_id,
+    buyerName: row.buyer_name ?? undefined,
+    createdAt: new Date(row.created_at),
   };
 }
 
@@ -53,7 +59,11 @@ function mapMessage(row: MessageRow, userId: string): Message {
 }
 
 /** Buyer-side entry point: fetches the buyer's conversation for a listing, creating it on first contact. */
-export async function getOrCreateConversation(listingId: string, buyerId: string): Promise<Conversation> {
+export async function getOrCreateConversation(
+  listingId: string,
+  buyerId: string,
+  buyerName?: string | null,
+): Promise<Conversation> {
   const { data: existing, error: fetchError } = await supabase
     .from('conversations')
     .select(CONVERSATION_COLUMNS)
@@ -70,7 +80,7 @@ export async function getOrCreateConversation(listingId: string, buyerId: string
 
   const { data: created, error: insertError } = await supabase
     .from('conversations')
-    .insert({ listing_id: listingId, buyer_id: buyerId })
+    .insert({ listing_id: listingId, buyer_id: buyerId, buyer_name: buyerName ?? null })
     .select(CONVERSATION_COLUMNS)
     .single();
 
@@ -94,6 +104,20 @@ export async function fetchConversation(conversationId: string): Promise<Convers
   }
 
   return mapConversation(data as ConversationRow);
+}
+
+export async function fetchConversationsForListing(listingId: string): Promise<Conversation[]> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(CONVERSATION_COLUMNS)
+    .eq('listing_id', listingId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => mapConversation(row as ConversationRow));
 }
 
 export async function fetchConversationsForUser(userId: string): Promise<Conversation[]> {
@@ -170,8 +194,14 @@ export function subscribeToMessages(
   userId: string,
   onInsert: (message: Message) => void,
 ): () => void {
+  const topic = `messages:${conversationId}`;
+  const existingChannel = supabase.getChannels().find((ch) => ch.topic === `realtime:${topic}`);
+  if (existingChannel) {
+    supabase.removeChannel(existingChannel);
+  }
+
   const channel = supabase
-    .channel(`messages:${conversationId}`)
+    .channel(topic)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` },

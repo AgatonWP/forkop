@@ -7,13 +7,14 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput,
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NationEmblem } from '@/components/nation-emblem';
+import { RatingModal } from '@/components/rating-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, SecondaryHeaderHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { getNation } from '@/lib/nations';
+import { Rating, fetchOwnRatingsForListings } from '@/lib/ratings';
 import {
   Listing,
   SOLD_LISTING_KEEP_MS,
@@ -21,6 +22,7 @@ import {
   fetchMyListings,
   formatListingEventDate,
   formatTicketQuantity,
+  getListingOrganizerName,
   markListingSold,
   restoreListingActive,
 } from '@/lib/tickets';
@@ -30,7 +32,7 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { initializing, user, signIn, signOut, signUp } = useAuth();
   const { t } = useI18n();
-  const [email, setEmail] = useState('forkop@forkop.se');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [submitting, setSubmitting] = useState(false);
@@ -40,6 +42,8 @@ export default function ProfileScreen() {
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [pendingListingId, setPendingListingId] = useState<string | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<Listing | null>(null);
+  const [ratingListing, setRatingListing] = useState<Listing | null>(null);
+  const [ownRatings, setOwnRatings] = useState<Map<string, Rating>>(new Map());
 
   const loadListings = useCallback(async () => {
     if (!user) {
@@ -90,6 +94,26 @@ export default function ProfileScreen() {
       ),
     [listings],
   );
+
+  useEffect(() => {
+    if (soldListings.length === 0) {
+      setOwnRatings(new Map());
+      return;
+    }
+
+    let active = true;
+    fetchOwnRatingsForListings(soldListings.map((listing) => listing.id))
+      .then((ratings) => {
+        if (active) setOwnRatings(ratings);
+      })
+      .catch(() => {
+        // Non-critical: the "rate buyer" affordance just won't reflect prior state.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [soldListings]);
 
   async function handleAuthSubmit() {
     if (!email.trim() || !password) return;
@@ -151,12 +175,12 @@ export default function ProfileScreen() {
 
     try {
       const soldListingId = await markListingSold(listing);
+      const soldListing = { ...listing, id: soldListingId, isSold: true, updatedAt: new Date() };
       setListings((current) =>
-        current.map((item) =>
-          item.id === listing.id ? { ...item, id: soldListingId, isSold: true, updatedAt: new Date() } : item,
-        ),
+        current.map((item) => (item.id === listing.id ? soldListing : item)),
       );
       setDeleteCandidate(null);
+      setRatingListing(soldListing);
     } catch (error) {
       setListingsError(error instanceof Error ? error.message : t('markSoldError'));
       setDeleteCandidate(null);
@@ -280,7 +304,9 @@ export default function ProfileScreen() {
                       listing={listing}
                       pending={pendingListingId === listing.id}
                       sold
+                      rating={ownRatings.get(listing.id)}
                       onDelete={() => setDeleteCandidate(listing)}
+                      onRate={() => setRatingListing(listing)}
                     />
                   ))
                 ) : (
@@ -363,6 +389,18 @@ export default function ProfileScreen() {
         onMarkSold={handleMarkSold}
         onRestore={handleRestoreListing}
       />
+      <RatingModal
+        listing={ratingListing}
+        onClose={() => setRatingListing(null)}
+        onSubmitted={() => {
+          if (!ratingListing) return;
+          fetchOwnRatingsForListings([ratingListing.id]).then((ratings) => {
+            const rating = ratings.get(ratingListing.id);
+            if (!rating) return;
+            setOwnRatings((current) => new Map(current).set(ratingListing.id, rating));
+          });
+        }}
+      />
     </ThemedView>
   );
 }
@@ -403,16 +441,20 @@ function ListingRow({
   listing,
   sold = false,
   pending = false,
+  rating,
   onDelete,
+  onRate,
 }: {
   listing: Listing;
   sold?: boolean;
   pending?: boolean;
+  rating?: Rating;
   onDelete: () => void;
+  onRate?: () => void;
 }) {
   const theme = useTheme();
   const { language, t } = useI18n();
-  const nationName = getNation(listing.nationId).name;
+  const nationName = getListingOrganizerName(listing);
   const listingMeta = [
     nationName,
     listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
@@ -449,6 +491,20 @@ function ListingRow({
 
       {sold ? (
         <>
+          {rating ? (
+            <View style={styles.ratedBadge}>
+              <ThemedText
+                style={[styles.ratedBadgeEmoji, { transform: [{ rotate: `${-(5 - rating.score) * 45}deg` }] }]}>
+                👍
+              </ThemedText>
+            </View>
+          ) : (
+            onRate && (
+              <Pressable onPress={onRate} style={styles.rateButton}>
+                <ThemedText style={styles.rateButtonText}>{t('rateBuyerAction')}</ThemedText>
+              </Pressable>
+            )
+          )}
           <View style={styles.soldBadge}>
             <ThemedText style={styles.soldBadgeText}>{t('sold')}</ThemedText>
           </View>
@@ -749,6 +805,28 @@ const styles = StyleSheet.create({
     color: '#687283',
     fontSize: 11,
     fontWeight: '800',
+  },
+  rateButton: {
+    backgroundColor: '#1D2430',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  rateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  ratedBadge: {
+    alignItems: 'center',
+    backgroundColor: '#DCF3E4',
+    borderRadius: 999,
+    height: 26,
+    justifyContent: 'center',
+    width: 26,
+  },
+  ratedBadgeEmoji: {
+    fontSize: 14,
   },
   actionGroup: {
     flexDirection: 'row',

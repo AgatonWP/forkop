@@ -1,16 +1,18 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { checkIsAdmin } from '@/lib/admin';
 import { pickAndUploadAvatar } from '@/lib/avatar';
 import { useAuth } from '@/lib/auth';
 import { Language, useI18n } from '@/lib/i18n';
+import { fetchOwnSwishNumber, saveOwnSwishNumber } from '@/lib/payment-details';
 import { disablePushNotifications, getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
 import { ThemeMode, useThemeMode } from '@/lib/theme-mode';
@@ -31,15 +33,35 @@ export default function SettingsScreen() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameSaved, setNameSaved] = useState(false);
 
+  const [swishNumber, setSwishNumber] = useState(user?.user_metadata?.swish_number ?? '');
+  const [swishSaving, setSwishSaving] = useState(false);
+  const [swishError, setSwishError] = useState<string | null>(null);
+  const [swishSaved, setSwishSaved] = useState(false);
+  const [swishDeleting, setSwishDeleting] = useState(false);
+
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(true);
   const [pushSubmitting, setPushSubmitting] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setAvatarUrl(user?.user_metadata?.avatar_url ?? null);
     setFullName(user?.user_metadata?.full_name ?? '');
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setSwishNumber('');
+      return;
+    }
+
+    fetchOwnSwishNumber(user.id)
+      .then(setSwishNumber)
+      .catch(() => setSwishError(t('swishNumberLoadError')));
+  }, [t, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -48,6 +70,17 @@ export default function SettingsScreen() {
       .then(setPushEnabled)
       .catch(() => setPushEnabled(false))
       .finally(() => setPushLoading(false));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+
+    checkIsAdmin()
+      .then(setIsAdmin)
+      .catch(() => setIsAdmin(false));
   }, [user]);
 
   async function handleChangeAvatar() {
@@ -83,6 +116,68 @@ export default function SettingsScreen() {
     } finally {
       setNameSaving(false);
     }
+  }
+
+  async function handleSaveSwish() {
+    if (!user || swishSaving) return;
+
+    setSwishSaving(true);
+    setSwishError(null);
+    setSwishSaved(false);
+
+    try {
+      await saveOwnSwishNumber(user.id, swishNumber);
+      setSwishSaved(true);
+    } catch (error) {
+      setSwishError(error instanceof Error ? error.message : t('swishNumberSaveError'));
+    } finally {
+      setSwishSaving(false);
+    }
+  }
+
+  async function handleDeleteSwish() {
+    if (!user || swishDeleting) return;
+
+    setSwishDeleting(true);
+    setSwishError(null);
+
+    try {
+      await saveOwnSwishNumber(user.id, '');
+      setSwishNumber('');
+      setSwishSaved(false);
+    } catch (error) {
+      setSwishError(error instanceof Error ? error.message : t('swishNumberSaveError'));
+    } finally {
+      setSwishDeleting(false);
+    }
+  }
+
+  function handleDeleteAccount() {
+    if (!user || deletingAccount) return;
+
+    Alert.alert(t('deleteAccountTitle'), t('deleteAccountConfirmation'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('deleteAccountButton'),
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingAccount(true);
+          setDeleteAccountError(null);
+
+          try {
+            const { error } = await supabase.functions.invoke('delete-account', { method: 'DELETE' });
+            if (error) throw error;
+
+            await supabase.auth.signOut({ scope: 'local' });
+            router.back();
+          } catch (error) {
+            setDeleteAccountError(error instanceof Error ? error.message : t('deleteAccountError'));
+          } finally {
+            setDeletingAccount(false);
+          }
+        },
+      },
+    ]);
   }
 
   async function handleTogglePush(next: boolean) {
@@ -185,6 +280,53 @@ export default function SettingsScreen() {
                 </View>
                 {nameError && <ThemedText style={styles.errorText}>{nameError}</ThemedText>}
               </View>
+
+              <View style={styles.nameRow}>
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  {t('swishNumberLabel')}
+                </ThemedText>
+                <View style={styles.nameInputRow}>
+                  <TextInput
+                    onChangeText={(text) => {
+                      setSwishNumber(text.replace(/[^\d\s+-]/g, ''));
+                      setSwishSaved(false);
+                    }}
+                    placeholder={t('swishNumberPlaceholder')}
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="phone-pad"
+                    style={[
+                      styles.input,
+                      styles.nameInput,
+                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                    ]}
+                    value={swishNumber}
+                  />
+                  <Pressable
+                    disabled={swishSaving}
+                    onPress={handleSaveSwish}
+                    style={[styles.saveButton, { opacity: swishSaving ? 0.55 : 1 }]}>
+                    <ThemedText style={styles.saveButtonText}>
+                      {swishSaving ? t('savingLabel') : swishSaved ? t('savedLabel') : t('saveNameButton')}
+                    </ThemedText>
+                  </Pressable>
+                  {swishNumber.trim().length > 0 && (
+                    <Pressable
+                      disabled={swishDeleting}
+                      onPress={handleDeleteSwish}
+                      style={[styles.deleteSwishButton, swishDeleting && styles.buttonDisabled]}>
+                      {swishDeleting ? (
+                        <ActivityIndicator size="small" color="#C84646" />
+                      ) : (
+                        <ThemedText style={styles.deleteSwishButtonText}>✕</ThemedText>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('swishNumberHint')}
+                </ThemedText>
+                {swishError && <ThemedText style={styles.errorText}>{swishError}</ThemedText>}
+              </View>
             </View>
           </View>
 
@@ -245,9 +387,57 @@ export default function SettingsScreen() {
               </View>
             </View>
           </View>
+
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>{t('legalSection')}</ThemedText>
+
+            <View style={[styles.card, styles.legalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+              <LegalLink label={t('privacyPolicy')} onPress={() => router.push('./privacy')} />
+              <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
+              <LegalLink label={t('termsOfUse')} onPress={() => router.push('./terms')} />
+              <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
+              <LegalLink label={t('support')} onPress={() => router.push('./support')} />
+              {isAdmin && (
+                <>
+                  <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
+                  <LegalLink label="Admin" onPress={() => router.push('./admin')} />
+                </>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>{t('accountSection')}</ThemedText>
+
+            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('deleteAccountDescription')}
+              </ThemedText>
+              <Pressable
+                disabled={deletingAccount}
+                onPress={handleDeleteAccount}
+                style={[styles.deleteAccountButton, deletingAccount && styles.buttonDisabled]}>
+                <ThemedText style={styles.deleteAccountButtonText}>
+                  {deletingAccount ? t('deletingAccount') : t('deleteAccountButton')}
+                </ThemedText>
+              </Pressable>
+              {deleteAccountError && <ThemedText style={styles.errorText}>{deleteAccountError}</ThemedText>}
+            </View>
+          </View>
         </View>
       </ScrollView>
     </ThemedView>
+  );
+}
+
+function LegalLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="link" onPress={onPress} style={styles.legalRow}>
+      <ThemedText style={styles.switchTitle}>{label}</ThemedText>
+      <ThemedText style={styles.legalChevron} themeColor="textSecondary">
+        ›
+      </ThemedText>
+    </Pressable>
   );
 }
 
@@ -341,6 +531,25 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.three,
   },
+  legalCard: {
+    gap: 0,
+    paddingVertical: Spacing.one,
+  },
+  legalRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 48,
+    paddingHorizontal: Spacing.two,
+  },
+  legalDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.two,
+  },
+  legalChevron: {
+    fontSize: 25,
+    lineHeight: 28,
+  },
   avatarRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -419,6 +628,37 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  deleteSwishButton: {
+    alignItems: 'center',
+    borderColor: '#C84646',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  deleteSwishButtonText: {
+    color: '#C84646',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  deleteAccountButton: {
+    alignItems: 'center',
+    borderColor: '#C84646',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: Spacing.three,
+  },
+  deleteAccountButtonText: {
+    color: '#C84646',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  buttonDisabled: {
+    opacity: 0.55,
   },
   switchRow: {
     alignItems: 'center',

@@ -76,7 +76,7 @@ export default function SellScreen() {
   const organizerName = nationId === 'other' ? customOrganizer.trim() : (selectedNation?.name ?? '');
   const customTicketTypeName = customTicketType.trim();
   const effectiveTicketType =
-    ticketType === 'Annan' && customTicketTypeName ? `Annan: ${customTicketTypeName}` : ticketType;
+    ticketType === 'Annan' && customTicketTypeName ? customTicketTypeName : ticketType;
   const ticketTypeReady = ticketType !== 'Annan' || customTicketTypeName.length > 0;
   const eventDisplayName = organizerName ? `${organizerName} – ${effectiveTicketType}` : '';
   const eventDateOptions = useMemo(() => {
@@ -103,9 +103,7 @@ export default function SellScreen() {
     wantedNationId === 'other' ? wantedCustomOrganizer.trim() : (selectedWantedNation?.name ?? '');
   const wantedCustomTicketTypeName = wantedCustomTicketType.trim();
   const effectiveWantedTicketType =
-    wantedTicketType === 'Annan' && wantedCustomTicketTypeName
-      ? `Annan: ${wantedCustomTicketTypeName}`
-      : wantedTicketType;
+    wantedTicketType === 'Annan' && wantedCustomTicketTypeName ? wantedCustomTicketTypeName : wantedTicketType;
   const wantedTicketTypeReady = wantedTicketType !== 'Annan' || wantedCustomTicketTypeName.length > 0;
   const tradeTargetDescription = wantedOrganizerName && wantedTicketTypeReady
     ? `${effectiveWantedTicketType} ${wantedOrganizerName} ${formatTicketQuantity(wantedQuantity)} st`

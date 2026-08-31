@@ -29,6 +29,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import { NATIONS_LIST, getNation, nationMatchesQuery, normalizeSearchText } from '@/lib/nations';
+import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
 import { ReportModal } from '@/components/report-modal';
 import {
   Listing,
@@ -37,6 +38,7 @@ import {
   formatListingEventDate,
   formatRelativeTime,
   formatTicketQuantity,
+  getListingOrganizerName,
   toLocalDateId,
 } from '@/lib/tickets';
 
@@ -310,7 +312,9 @@ export default function HomeScreen() {
               </View>
 
               <ThemedText type="small" themeColor="textSecondary">
-                {listingsLoading ? t('loadingListings') : `${filteredListings.length} ${t('listings')}`}
+                {listingsLoading
+                  ? t('loadingListings')
+                  : `${filteredListings.length} ${filteredListings.length === 1 ? t('listing') : t('listings')}`}
               </ThemedText>
             </View>
           }
@@ -410,11 +414,12 @@ function FilterBarButton({
   return (
     <Pressable
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         styles.filterBarButton,
         {
           backgroundColor: active ? '#FFC8A5' : theme.backgroundElement,
           borderColor: active ? '#E39E7273' : theme.backgroundSelected,
+          opacity: pressed ? 0.72 : 1,
         },
       ]}>
       <ThemedText
@@ -690,7 +695,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
   const useLogoWatermark = listing.nationId === 'mejeriet';
   const usePhotoWatermark = listing.nationId === 'karneval';
   const listingMeta = [
-    nation.name,
+    getListingOrganizerName(listing),
     listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
     formatRelativeTime(listing.createdAt),
   ].filter(Boolean).join(' · ');
@@ -787,9 +792,30 @@ function ListingModal({
   const { user } = useAuth();
   const { language, t } = useI18n();
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const nationName = listing ? getNation(listing.nationId).name : '';
+  const nationName = listing ? getListingOrganizerName(listing) : '';
   const titleText = listing ? listing.ticketType : '';
   const isOwnListing = !!user && !!listing && listing.userId === user.id;
+  const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
+
+  useEffect(() => {
+    if (!listing) {
+      setRatingSummary(null);
+      return;
+    }
+
+    let active = true;
+    fetchRatingSummary(listing.userId)
+      .then((summary) => {
+        if (active) setRatingSummary(summary.count > 0 ? summary : null);
+      })
+      .catch(() => {
+        if (active) setRatingSummary(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [listing]);
 
   useEffect(() => {
     if (!listing) return;
@@ -800,7 +826,7 @@ function ListingModal({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [listing?.id, sheetTranslateY]);
+  }, [listing, sheetTranslateY]);
 
   const closeFromDrag = useCallback(() => {
     Animated.timing(sheetTranslateY, {
@@ -882,9 +908,23 @@ function ListingModal({
                   </ThemedText>
                   <ThemedText style={styles.modalTitle}>{titleText}</ThemedText>
                   {listing.sellerName && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {t('postedBy')} {listing.sellerName}
-                    </ThemedText>
+                    <View style={styles.sellerRow}>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {t('postedBy')} {listing.sellerName}
+                      </ThemedText>
+                      {ratingSummary && (
+                        <View style={styles.sellerRatingBadge}>
+                          <ThemedText
+                            style={[
+                              styles.sellerRatingEmoji,
+                              { transform: [{ rotate: `${-(5 - Math.round(ratingSummary.average)) * 45}deg` }] },
+                            ]}>
+                            👍
+                          </ThemedText>
+                          <ThemedText style={styles.sellerRatingCount}>({ratingSummary.count})</ThemedText>
+                        </View>
+                      )}
+                    </View>
                   )}
                 </View>
 
@@ -1372,6 +1412,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0,
     lineHeight: 34,
+  },
+  sellerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  sellerRatingBadge: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  sellerRatingEmoji: {
+    fontSize: 13,
+  },
+  sellerRatingCount: {
+    color: '#687283',
+    fontSize: 11,
+    fontWeight: '700',
   },
   modalStats: {
     flexDirection: 'row',
