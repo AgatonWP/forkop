@@ -17,6 +17,8 @@ import { disablePushNotifications, getPushEnabled, registerForPushNotifications 
 import { supabase } from '@/lib/supabase';
 import { ThemeMode, useThemeMode } from '@/lib/theme-mode';
 
+const MAX_DISPLAY_NAME_LENGTH = 25;
+
 export default function SettingsScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
@@ -107,7 +109,9 @@ export default function SettingsScreen() {
     setNameSaved(false);
 
     try {
-      const { error } = await supabase.auth.updateUser({ data: { full_name: fullName.trim() } });
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: fullName.trim().slice(0, MAX_DISPLAY_NAME_LENGTH) },
+      });
 
       if (error) throw new Error(error.message);
       setNameSaved(true);
@@ -256,6 +260,7 @@ export default function SettingsScreen() {
                 </ThemedText>
                 <View style={styles.nameInputRow}>
                   <TextInput
+                    maxLength={MAX_DISPLAY_NAME_LENGTH}
                     onChangeText={(text) => {
                       setFullName(text);
                       setNameSaved(false);

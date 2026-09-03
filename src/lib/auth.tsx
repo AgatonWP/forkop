@@ -8,7 +8,7 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>;
   signOut: () => Promise<void>;
 };
 
@@ -49,11 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       async signUp(email, password) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password });
 
         if (error) {
           throw new Error(error.message);
         }
+
+        // With "Confirm email" enabled in Supabase, signUp succeeds but
+        // returns no session until the user clicks the emailed link.
+        return { needsEmailConfirmation: !data.session };
       },
       async signOut() {
         const { error } = await supabase.auth.signOut();

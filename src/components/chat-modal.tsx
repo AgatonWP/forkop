@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -33,9 +34,10 @@ import {
   subscribeToMessages,
 } from '@/lib/messages';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
-import { Listing, formatListingEventDate, formatTicketQuantity } from '@/lib/tickets';
+import { Listing, formatListingEventDate, formatTicketQuantity, markListingSold } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 import { ReportModal } from '@/components/report-modal';
+import { RatingModal } from '@/components/rating-modal';
 import { blockUser, getBlockStatus, unblockUser } from '@/lib/blocking';
 import { fetchSellerSwishNumber } from '@/lib/payment-details';
 
@@ -44,9 +46,11 @@ type Props = {
   /** When opened from an inbox (e.g. as the seller), pass the known conversation id to skip creation. */
   conversationId?: string;
   onClose: () => void;
+  /** Notifies the caller (e.g. the inbox list) when the seller marks the listing sold from here. */
+  onListingSold?: (listing: Listing) => void;
 };
 
-export function ChatModal({ listing, conversationId, onClose }: Props) {
+export function ChatModal({ listing, conversationId, onClose, onListingSold }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -67,6 +71,8 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
   const [blockedByMe, setBlockedByMe] = useState(false);
   const [interactionBlocked, setInteractionBlocked] = useState(false);
   const [blockSubmitting, setBlockSubmitting] = useState(false);
+  const [markingSold, setMarkingSold] = useState(false);
+  const [ratingListing, setRatingListing] = useState<Listing | null>(null);
   const listRef = useRef<FlatList>(null);
   const screenTranslateX = useRef(new Animated.Value(0)).current;
 
@@ -105,7 +111,12 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
 
     const load = conversationId
       ? fetchConversation(conversationId)
-      : getOrCreateConversation(listing.id, user.id, user.user_metadata?.full_name ?? user.email?.split('@')[0]);
+      : getOrCreateConversation(
+          listing.id,
+          user.id,
+          user.user_metadata?.full_name ?? user.email?.split('@')[0],
+          user.user_metadata?.avatar_url,
+        );
 
     load
       .then(async (conv) => {
@@ -244,32 +255,58 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
     }
   }, [blockedByMe, blockSubmitting, conversation, t, user]);
 
+  const handleMarkSold = useCallback(async () => {
+    if (!listing || !user || listing.userId !== user.id || listing.isSold || markingSold) return;
+
+    setMarkingSold(true);
+    setSendError(null);
+
+    try {
+      const soldListingId = await markListingSold(listing);
+      const soldListing = { ...listing, id: soldListingId, isSold: true, updatedAt: new Date() };
+      onListingSold?.(soldListing);
+      setRatingListing(soldListing);
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : t('markSoldError'));
+    } finally {
+      setMarkingSold(false);
+    }
+  }, [listing, markingSold, onListingSold, t, user]);
+
   const openSafetyMenu = useCallback(() => {
     if (!conversation || !user) {
       setReportOpen(true);
       return;
     }
 
-    Alert.alert(t('safetyActions'), undefined, [
-      { text: t('reportUser'), onPress: () => setReportOpen(true) },
-      {
-        text: blockedByMe ? t('unblockUser') : t('blockUser'),
-        style: blockedByMe ? 'default' : 'destructive',
-        onPress: () => {
-          if (blockedByMe) {
-            handleToggleBlock();
-            return;
-          }
+    const canMarkSold = !!listing && listing.userId === user.id && !listing.isSold;
 
-          Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
-            { text: t('cancel'), style: 'cancel' },
-            { text: t('blockUser'), style: 'destructive', onPress: handleToggleBlock },
-          ]);
-        },
+    const options: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+
+    if (canMarkSold) {
+      options.push({ text: t('markAsSold'), onPress: handleMarkSold });
+    }
+
+    options.push({ text: t('reportUser'), onPress: () => setReportOpen(true) });
+    options.push({
+      text: blockedByMe ? t('unblockUser') : t('blockUser'),
+      style: blockedByMe ? 'default' : 'destructive',
+      onPress: () => {
+        if (blockedByMe) {
+          handleToggleBlock();
+          return;
+        }
+
+        Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
+          { text: t('cancel'), style: 'cancel' },
+          { text: t('blockUser'), style: 'destructive', onPress: handleToggleBlock },
+        ]);
       },
-      { text: t('cancel'), style: 'cancel' },
-    ]);
-  }, [blockedByMe, conversation, handleToggleBlock, t, user]);
+    });
+    options.push({ text: t('cancel'), style: 'cancel' });
+
+    Alert.alert(t('safetyActions'), undefined, options);
+  }, [blockedByMe, conversation, handleMarkSold, handleToggleBlock, listing, t, user]);
 
   const handleOpenSwish = useCallback(async () => {
     try {
@@ -330,6 +367,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
 
   const isSeller = !!user && listing.userId === user.id;
   const otherPartyName = isSeller ? (conversation?.buyerName ?? t('buyer')) : (listing.sellerName ?? t('seller'));
+  const otherPartyAvatarUrl = isSeller ? conversation?.buyerAvatarUrl : listing.sellerAvatarUrl;
   const listingMeta = [
     listing.eventName,
     listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
@@ -364,6 +402,15 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
           <Pressable onPress={onClose} style={styles.backButton} hitSlop={8}>
             <ThemedText style={styles.backIcon}>‹</ThemedText>
           </Pressable>
+          {otherPartyAvatarUrl ? (
+            <Image contentFit="cover" source={{ uri: otherPartyAvatarUrl }} style={styles.headerAvatar} />
+          ) : (
+            <View style={[styles.headerAvatar, styles.headerAvatarFallback, { backgroundColor: theme.backgroundSelected }]}>
+              <ThemedText style={styles.headerAvatarFallbackText} themeColor="textSecondary">
+                {otherPartyName[0]?.toUpperCase() ?? '?'}
+              </ThemedText>
+            </View>
+          )}
           <View style={styles.headerCenter}>
             <ThemedText numberOfLines={1} style={styles.headerTitle}>
               {otherPartyName}
@@ -389,7 +436,7 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
           <View style={styles.headerRight}>
             <Pressable
               accessibilityLabel="Rapportera"
-              disabled={blockSubmitting}
+              disabled={blockSubmitting || markingSold}
               hitSlop={8}
               onPress={openSafetyMenu}
               style={styles.moreButton}>
@@ -542,6 +589,8 @@ export function ChatModal({ listing, conversationId, onClose }: Props) {
         listing={listing}
         mode="chat"
       />
+
+      <RatingModal listing={ratingListing} onClose={() => setRatingListing(null)} />
     </Modal>
   );
 }
@@ -602,6 +651,20 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '400',
     lineHeight: 34,
+  },
+  headerAvatar: {
+    borderRadius: 16,
+    height: 32,
+    marginRight: Spacing.two,
+    width: 32,
+  },
+  headerAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarFallbackText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   headerCenter: {
     flex: 1,

@@ -195,6 +195,16 @@ export default function MessagesScreen() {
         listing={openItem?.listing ?? null}
         conversationId={openItem?.conversation.id}
         onClose={() => setOpenItem(null)}
+        onListingSold={(soldListing) => {
+          setItems((current) =>
+            current.map((item) =>
+              item.listing.id === soldListing.id ? { ...item, listing: soldListing } : item,
+            ),
+          );
+          setOpenItem((current) =>
+            current && current.listing.id === soldListing.id ? { ...current, listing: soldListing } : current,
+          );
+        }}
       />
     </ThemedView>
   );
@@ -217,7 +227,7 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
         {
           backgroundColor: theme.backgroundElement,
           borderColor: isUnread ? '#C84646' : theme.backgroundSelected,
-          opacity: pressed ? 0.72 : 1,
+          opacity: pressed ? 0.72 : item.listing.isSold ? 0.55 : 1,
         },
       ]}>
       <NationEmblem nationId={item.listing.nationId} />
@@ -229,6 +239,11 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
           <View style={[styles.roleBadge, item.isSeller ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
             <ThemedText style={styles.roleBadgeText}>{item.isSeller ? t('seller') : t('buyer')}</ThemedText>
           </View>
+          {item.listing.isSold && (
+            <View style={styles.soldBadge}>
+              <ThemedText style={styles.soldBadgeText}>{t('sold')}</ThemedText>
+            </View>
+          )}
         </View>
         <ThemedText
           numberOfLines={1}
@@ -355,6 +370,18 @@ const styles = StyleSheet.create({
   },
   roleBadgeText: {
     color: '#1D2430',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  soldBadge: {
+    backgroundColor: '#EEF0F4',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  soldBadgeText: {
+    color: '#687283',
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',

@@ -14,6 +14,7 @@ export type Conversation = {
   buyerId: string;
   sellerId: string;
   buyerName?: string;
+  buyerAvatarUrl?: string;
   createdAt: Date;
 };
 
@@ -23,6 +24,7 @@ type ConversationRow = {
   buyer_id: string;
   seller_id: string;
   buyer_name: string | null;
+  buyer_avatar_url: string | null;
   created_at: string;
 };
 
@@ -34,7 +36,7 @@ type MessageRow = {
   created_at: string;
 };
 
-const CONVERSATION_COLUMNS = 'id,listing_id,buyer_id,seller_id,buyer_name,created_at';
+const CONVERSATION_COLUMNS = 'id,listing_id,buyer_id,seller_id,buyer_name,buyer_avatar_url,created_at';
 const MESSAGE_COLUMNS = 'id,conversation_id,sender_id,body,created_at';
 
 function mapConversation(row: ConversationRow): Conversation {
@@ -44,6 +46,7 @@ function mapConversation(row: ConversationRow): Conversation {
     buyerId: row.buyer_id,
     sellerId: row.seller_id,
     buyerName: row.buyer_name ?? undefined,
+    buyerAvatarUrl: row.buyer_avatar_url ?? undefined,
     createdAt: new Date(row.created_at),
   };
 }
@@ -63,6 +66,7 @@ export async function getOrCreateConversation(
   listingId: string,
   buyerId: string,
   buyerName?: string | null,
+  buyerAvatarUrl?: string | null,
 ): Promise<Conversation> {
   const { data: existing, error: fetchError } = await supabase
     .from('conversations')
@@ -80,7 +84,12 @@ export async function getOrCreateConversation(
 
   const { data: created, error: insertError } = await supabase
     .from('conversations')
-    .insert({ listing_id: listingId, buyer_id: buyerId, buyer_name: buyerName ?? null })
+    .insert({
+      listing_id: listingId,
+      buyer_id: buyerId,
+      buyer_name: buyerName ?? null,
+      buyer_avatar_url: buyerAvatarUrl ?? null,
+    })
     .select(CONVERSATION_COLUMNS)
     .single();
 

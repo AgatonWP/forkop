@@ -14,7 +14,7 @@ import { BottomTabInset, MaxContentWidth, SecondaryHeaderHeight, Spacing } from 
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { Rating, fetchOwnRatingsForListings } from '@/lib/ratings';
+import { Rating, RatingSummary, fetchOwnRatingsForListings, fetchRatingSummary } from '@/lib/ratings';
 import {
   Listing,
   SOLD_LISTING_KEEP_MS,
@@ -37,6 +37,7 @@ export default function ProfileScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [listingsError, setListingsError] = useState<string | null>(null);
@@ -44,6 +45,27 @@ export default function ProfileScreen() {
   const [deleteCandidate, setDeleteCandidate] = useState<Listing | null>(null);
   const [ratingListing, setRatingListing] = useState<Listing | null>(null);
   const [ownRatings, setOwnRatings] = useState<Map<string, Rating>>(new Map());
+  const [ownRatingSummary, setOwnRatingSummary] = useState<RatingSummary | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setOwnRatingSummary(null);
+      return;
+    }
+
+    let active = true;
+    fetchRatingSummary(user.id)
+      .then((summary) => {
+        if (active) setOwnRatingSummary(summary.count > 0 ? summary : null);
+      })
+      .catch(() => {
+        if (active) setOwnRatingSummary(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const loadListings = useCallback(async () => {
     if (!user) {
@@ -120,12 +142,16 @@ export default function ProfileScreen() {
 
     setSubmitting(true);
     setAuthError(null);
+    setConfirmationEmailSent(false);
 
     try {
       if (mode === 'signin') {
         await signIn(email.trim(), password);
       } else {
-        await signUp(email.trim(), password);
+        const { needsEmailConfirmation } = await signUp(email.trim(), password);
+        if (needsEmailConfirmation) {
+          setConfirmationEmailSent(true);
+        }
       }
       setPassword('');
     } catch (error) {
@@ -262,9 +288,23 @@ export default function ProfileScreen() {
                   </View>
                 )}
                 <View style={styles.profileCopy}>
-                  <ThemedText numberOfLines={1} style={styles.profileName}>
-                    {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Forkop'}
-                  </ThemedText>
+                  <View style={styles.profileNameRow}>
+                    <ThemedText numberOfLines={1} style={styles.profileName}>
+                      {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Forkop'}
+                    </ThemedText>
+                    {ownRatingSummary && (
+                      <View style={styles.ownRatingBadge}>
+                        <ThemedText
+                          style={[
+                            styles.ownRatingEmoji,
+                            { transform: [{ rotate: `${-(5 - Math.round(ownRatingSummary.average)) * 45}deg` }] },
+                          ]}>
+                          👍
+                        </ThemedText>
+                        <ThemedText style={styles.ownRatingCount}>({ownRatingSummary.count})</ThemedText>
+                      </View>
+                    )}
+                  </View>
                   <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
                     {user.email}
                   </ThemedText>
@@ -322,18 +362,32 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.authTitle}>
                   {mode === 'signin' ? t('signIn') : t('signUp')}
                 </ThemedText>
-                <Pressable onPress={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
+                <Pressable
+                  onPress={() => {
+                    setMode(mode === 'signin' ? 'signup' : 'signin');
+                    setAuthError(null);
+                    setConfirmationEmailSent(false);
+                  }}>
                   <ThemedText style={styles.authSwitch}>
                     {mode === 'signin' ? t('signUp') : t('signIn')}
                   </ThemedText>
                 </Pressable>
               </View>
 
+              {confirmationEmailSent && (
+                <ThemedText type="small" style={styles.confirmationNotice}>
+                  {t('confirmEmailNotice')}
+                </ThemedText>
+              )}
+
               <TextInput
                 autoCapitalize="none"
                 autoComplete="email"
                 keyboardType="email-address"
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setConfirmationEmailSent(false);
+                }}
                 placeholder="Email"
                 placeholderTextColor={theme.textSecondary}
                 style={[
@@ -681,10 +735,29 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  profileNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
   profileName: {
+    flexShrink: 1,
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,
+  },
+  ownRatingBadge: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  ownRatingEmoji: {
+    fontSize: 15,
+  },
+  ownRatingCount: {
+    color: '#9AA3B2',
+    fontSize: 13,
+    fontWeight: '700',
   },
   authPanel: {
     borderRadius: 8,
@@ -707,6 +780,13 @@ const styles = StyleSheet.create({
     color: '#4F6FB7',
     fontSize: 13,
     fontWeight: '800',
+  },
+  confirmationNotice: {
+    backgroundColor: '#EAF0FF',
+    borderRadius: 8,
+    color: '#2E4C9C',
+    fontWeight: '700',
+    padding: Spacing.two,
   },
   input: {
     borderRadius: 8,

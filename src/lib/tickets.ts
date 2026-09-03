@@ -22,6 +22,7 @@ export type Listing = {
   isSold?: boolean;
   nationId: string;
   sellerName?: string;
+  sellerAvatarUrl?: string;
 };
 
 export const MAX_EXACT_TICKET_QUANTITY = 20;
@@ -79,10 +80,11 @@ type ListingRow = {
   nation_id: string;
   status: 'active' | 'sold' | 'archived';
   seller_name: string | null;
+  seller_avatar_url: string | null;
 };
 
 const LISTING_COLUMNS =
-  'id,user_id,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,updated_at,nation_id,status,seller_name';
+  'id,user_id,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,updated_at,nation_id,status,seller_name,seller_avatar_url';
 
 export function parseListingEventDate(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -138,6 +140,7 @@ function mapListing(row: ListingRow): Listing {
     isSold: row.status === 'sold',
     nationId: row.nation_id,
     sellerName: row.seller_name ?? undefined,
+    sellerAvatarUrl: row.seller_avatar_url ?? undefined,
   };
 }
 

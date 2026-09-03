@@ -197,6 +197,7 @@ export default function SellScreen() {
       contact_info: '',
       nation_id: nationId,
       seller_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? null,
+      seller_avatar_url: user.user_metadata?.avatar_url ?? null,
     });
 
     setSubmitting(false);
