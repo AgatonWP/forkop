@@ -1,12 +1,12 @@
-# Integritetspolicy för Forkop
+# Integritetspolicy för Förköp
 
 Senast uppdaterad: 27 augusti 2026
 
-Den här integritetspolicyn beskriver hur personuppgifter behandlas när du använder appen Forkop.
+Den här integritetspolicyn beskriver hur personuppgifter behandlas när du använder appen Förköp.
 
 ## 1. Personuppgiftsansvarig
 
-Agaton Westman Prage är personuppgiftsansvarig för behandlingen av personuppgifter i Forkop.
+Agaton Westman Prage är personuppgiftsansvarig för behandlingen av personuppgifter i Förköp.
 
 Kontakt: agaton.westman.prage@gmail.com
 
@@ -23,13 +23,13 @@ Kontakt: agaton.westman.prage@gmail.com
 | Rapporter och blockeringar | När du rapporterar eller blockerar | Förebygga missbruk och moderera tjänsten |
 | Push-token | Om du aktiverar pushnotiser | Skicka notiser om nya meddelanden |
 
-Lösenord hanteras av vår autentiseringsleverantör Supabase. Forkop kan inte läsa ditt lösenord i klartext.
+Lösenord hanteras av vår autentiseringsleverantör Supabase. Förköp kan inte läsa ditt lösenord i klartext.
 
 Vi använder inte tredjepartsannonser och samlar inte in platsdata eller kontakter från din enhet.
 
 ## 3. Rättslig grund
 
-- **Fullgörande av avtal:** kontouppgifter, annonser, chattar och andra uppgifter som behövs för att tillhandahålla Forkop.
+- **Fullgörande av avtal:** kontouppgifter, annonser, chattar och andra uppgifter som behövs för att tillhandahålla Förköp.
 - **Berättigat intresse:** rapporter, blockeringar och nödvändig behandling för att förebygga missbruk och hålla tjänsten säker. Vårt intresse är att skydda användarna och tjänsten.
 - **Samtycke:** pushnotiser skickas bara om du godkänner notiser i enhetens inställningar. Du kan återkalla tillståndet när som helst.
 

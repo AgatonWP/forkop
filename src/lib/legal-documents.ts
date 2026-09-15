@@ -12,16 +12,16 @@ export type LegalDocument = {
 };
 
 export const privacyPolicy: LegalDocument = {
-  title: 'Integritetspolicy för Forkop',
+  title: 'Integritetspolicy för Förköp',
   updatedAt: '27 augusti 2026',
   introduction: [
-    'Den här integritetspolicyn beskriver hur personuppgifter behandlas när du använder appen Forkop.',
+    'Den här integritetspolicyn beskriver hur personuppgifter behandlas när du använder appen Förköp.',
   ],
   sections: [
     {
       title: '1. Personuppgiftsansvarig',
       paragraphs: [
-        'Agaton Westman Prage är personuppgiftsansvarig för behandlingen av personuppgifter i Forkop.',
+        'Agaton Westman Prage är personuppgiftsansvarig för behandlingen av personuppgifter i Förköp.',
         'Kontakt: agaton.westman.prage@gmail.com',
       ],
     },
@@ -38,14 +38,14 @@ export const privacyPolicy: LegalDocument = {
         'Push-token, om du aktiverar pushnotiser: för att skicka notiser om nya meddelanden.',
       ],
       paragraphs: [
-        'Lösenord hanteras av vår autentiseringsleverantör Supabase. Forkop kan inte läsa ditt lösenord i klartext.',
+        'Lösenord hanteras av vår autentiseringsleverantör Supabase. Förköp kan inte läsa ditt lösenord i klartext.',
         'Vi använder inte tredjepartsannonser och samlar inte in platsdata eller kontakter från din enhet.',
       ],
     },
     {
       title: '3. Rättslig grund',
       bullets: [
-        'Fullgörande av avtal: kontouppgifter, annonser, chattar och andra uppgifter som behövs för att tillhandahålla Forkop.',
+        'Fullgörande av avtal: kontouppgifter, annonser, chattar och andra uppgifter som behövs för att tillhandahålla Förköp.',
         'Berättigat intresse: rapporter, blockeringar och nödvändig behandling för att förebygga missbruk och hålla tjänsten säker. Vårt intresse är att skydda användarna och tjänsten.',
         'Samtycke: pushnotiser skickas bara om du godkänner notiser i enhetens inställningar. Du kan återkalla tillståndet när som helst.',
       ],
@@ -114,16 +114,16 @@ export const privacyPolicy: LegalDocument = {
 };
 
 export const termsOfUse: LegalDocument = {
-  title: 'Användarvillkor för Forkop',
+  title: 'Användarvillkor för Förköp',
   updatedAt: '27 augusti 2026',
   introduction: [
-    'Dessa villkor gäller när du skapar ett konto eller använder Forkop. Genom att använda tjänsten godkänner du villkoren.',
+    'Dessa villkor gäller när du skapar ett konto eller använder Förköp. Genom att använda tjänsten godkänner du villkoren.',
   ],
   sections: [
     {
       title: '1. Om tjänsten',
       paragraphs: [
-        'Forkop tillhandahålls av Agaton Westman Prage och är en digital mötesplats där användare kan lägga upp, hitta, köpa, sälja och byta biljetter. Forkop förmedlar kontakten men är inte part i någon överenskommelse, biljettöverlåtelse eller betalning mellan användare.',
+        'Förköp tillhandahålls av Agaton Westman Prage och är en digital mötesplats där användare kan lägga upp, hitta, köpa, sälja och byta biljetter. Förköp förmedlar kontakten men är inte part i någon överenskommelse, biljettöverlåtelse eller betalning mellan användare.',
       ],
     },
     {
@@ -141,7 +141,7 @@ export const termsOfUse: LegalDocument = {
         'Du får bara annonsera sådant som du har rätt att sälja eller byta och måste beskriva det sanningsenligt.',
         'Kontrollera själv att en biljett får överlåtas och följ arrangörens villkor samt tillämplig lag.',
         'Olagligt, vilseledande, hotfullt, kränkande, diskriminerande eller rättighetsintrångande innehåll är förbjudet. Spam, bedrägeriförsök och trakasserier är också förbjudna.',
-        'Du behåller rättigheterna till ditt innehåll men ger oss en icke-exklusiv rätt att lagra och visa det i den utsträckning som behövs för att driva Forkop.',
+        'Du behåller rättigheterna till ditt innehåll men ger oss en icke-exklusiv rätt att lagra och visa det i den utsträckning som behövs för att driva Förköp.',
         'Vi får granska rapporter och ta bort innehåll eller begränsa konton som bryter mot villkoren eller innebär risk för användare eller tjänsten.',
       ],
     },
@@ -154,9 +154,9 @@ export const termsOfUse: LegalDocument = {
     {
       title: '5. Betalningar och biljetter',
       bullets: [
-        'Betalningar, exempelvis via Swish, sker direkt mellan köpare och säljare utanför Forkop. Vi tar inte emot, håller eller återbetalar pengar.',
+        'Betalningar, exempelvis via Swish, sker direkt mellan köpare och säljare utanför Förköp. Vi tar inte emot, håller eller återbetalar pengar.',
         'Du ansvarar själv för att kontrollera motparten, biljettens äkthet, överlåtbarhet, pris och leverans innan du betalar eller lämnar över en biljett.',
-        'Forkop garanterar inte att en annons är korrekt, att en biljett är giltig eller att en affär slutförs.',
+        'Förköp garanterar inte att en annons är korrekt, att en biljett är giltig eller att en affär slutförs.',
       ],
     },
     {
@@ -168,19 +168,19 @@ export const termsOfUse: LegalDocument = {
     {
       title: '7. Tillgänglighet och ansvar',
       paragraphs: [
-        'Forkop tillhandahålls i befintligt skick och tjänsten kan ibland vara otillgänglig eller innehålla fel. I den utsträckning lagen tillåter ansvarar vi inte för användares handlingar, biljettens giltighet, uteblivna affärer, betalningstvister eller indirekta skador. Detta begränsar inte ansvar som följer av tvingande lag.',
+        'Förköp tillhandahålls i befintligt skick och tjänsten kan ibland vara otillgänglig eller innehålla fel. I den utsträckning lagen tillåter ansvarar vi inte för användares handlingar, biljettens giltighet, uteblivna affärer, betalningstvister eller indirekta skador. Detta begränsar inte ansvar som följer av tvingande lag.',
       ],
     },
     {
       title: '8. Avstängning och avslut',
       paragraphs: [
-        'Du kan när som helst sluta använda Forkop och radera ditt konto i appens inställningar. Vi får ta bort innehåll, begränsa funktioner eller stänga av ett konto vid brott mot villkoren, misstänkt missbruk, säkerhetsrisk eller rättslig skyldighet.',
+        'Du kan när som helst sluta använda Förköp och radera ditt konto i appens inställningar. Vi får ta bort innehåll, begränsa funktioner eller stänga av ett konto vid brott mot villkoren, misstänkt missbruk, säkerhetsrisk eller rättslig skyldighet.',
       ],
     },
     {
       title: '9. Ändringar och tjänstens upphörande',
       paragraphs: [
-        'Vi kan utveckla, ändra eller avsluta hela eller delar av Forkop. Om villkoren ändras väsentligt informerar vi i appen eller på annat lämpligt sätt. Fortsatt användning efter att nya villkor börjat gälla innebär att de nya villkoren accepteras.',
+        'Vi kan utveckla, ändra eller avsluta hela eller delar av Förköp. Om villkoren ändras väsentligt informerar vi i appen eller på annat lämpligt sätt. Fortsatt användning efter att nya villkor börjat gälla innebär att de nya villkoren accepteras.',
       ],
     },
     {
@@ -197,8 +197,8 @@ export const termsOfUse: LegalDocument = {
 };
 
 export const supportInformation: LegalDocument = {
-  title: 'Support för Forkop',
-  introduction: ['Behöver du hjälp med Forkop, vill rapportera ett problem eller lämna feedback?'],
+  title: 'Support för Förköp',
+  introduction: ['Behöver du hjälp med Förköp, vill rapportera ett problem eller lämna feedback?'],
   sections: [
     {
       title: 'Kontakt',

@@ -51,6 +51,9 @@ type Props = {
   onListingSold?: (listing: Listing) => void;
 };
 
+/** Matches the check constraint on messages.body. */
+const MAX_MESSAGE_LENGTH = 2000;
+
 export function ChatModal({ listing, conversationId, onClose, onListingSold }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -144,7 +147,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
       })
       .catch((error) => {
         if (!active) return;
-        setLoadError(error instanceof Error ? error.message : 'Kunde inte ladda chatten.');
+        setLoadError(t('chatLoadError'));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -153,7 +156,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
     return () => {
       active = false;
     };
-  }, [listing, conversationId, draftKey, user, markConversationRead]);
+  }, [listing, conversationId, draftKey, user, markConversationRead, t]);
 
   useEffect(() => {
     if (!conversation || !user) {
@@ -231,12 +234,12 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
       setDraft('');
       if (draftKey) clearDraft(draftKey);
       setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
-    } catch (error) {
-      setSendError(error instanceof Error ? error.message : 'Kunde inte skicka meddelandet.');
+    } catch {
+      setSendError(t('chatSendError'));
     } finally {
       setSending(false);
     }
-  }, [conversation, user, draft, draftKey, sending]);
+  }, [conversation, user, draft, draftKey, sending, t]);
 
   const handleCopySwishNumber = useCallback(async () => {
     if (!sellerSwishNumber) return;
@@ -264,8 +267,8 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
         setBlockedByMe(true);
         setInteractionBlocked(true);
       }
-    } catch (error) {
-      setSendError(error instanceof Error ? error.message : t('blockUserError'));
+    } catch {
+      setSendError(t('blockUserError'));
     } finally {
       setBlockSubmitting(false);
     }
@@ -282,8 +285,8 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
       const soldListing = { ...listing, id: soldListingId, isSold: true, updatedAt: new Date() };
       onListingSold?.(soldListing);
       setRatingListing(soldListing);
-    } catch (error) {
-      setSendError(error instanceof Error ? error.message : t('markSoldError'));
+    } catch {
+      setSendError(t('markSoldError'));
     } finally {
       setMarkingSold(false);
     }
@@ -567,6 +570,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
                   onChangeText={handleDraftChange}
                   placeholder="Skriv ett meddelande..."
                   placeholderTextColor={theme.textSecondary}
+                  maxLength={MAX_MESSAGE_LENGTH}
                   multiline
                   submitBehavior="submit"
                   editable={!sending}

@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { useAppUpdateCheck } from '@/hooks/use-app-update-check';
 import { AuthProvider } from '@/lib/auth';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeModeProvider, useThemeMode } from '@/lib/theme-mode';
@@ -24,6 +25,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { themeMode } = useThemeMode();
+  useAppUpdateCheck();
 
   return (
     <ThemeProvider value={themeMode === 'dark' ? DarkTheme : DefaultTheme}>
@@ -36,6 +38,7 @@ function RootNavigator() {
         <Stack.Screen name="support" />
         <Stack.Screen name="admin" />
         <Stack.Screen name="auth-redirect" />
+        <Stack.Screen name="reset-password" />
       </Stack>
     </ThemeProvider>
   );

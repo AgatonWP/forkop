@@ -1,12 +1,12 @@
-# Privacy Policy for Forkop
+# Privacy Policy for Förköp
 
 Last updated: 27 August 2026
 
-This privacy policy describes how personal data is processed when you use the Forkop app.
+This privacy policy describes how personal data is processed when you use the Förköp app.
 
 ## 1. Data Controller
 
-Agaton Westman Prage is the data controller for the processing of personal data in Forkop.
+Agaton Westman Prage is the data controller for the processing of personal data in Förköp.
 
 Contact: agaton.westman.prage@gmail.com
 
@@ -23,13 +23,13 @@ Contact: agaton.westman.prage@gmail.com
 | Reports and blocks | When you report or block someone | Prevent misuse and moderate the service |
 | Push token | If you enable push notifications | Send notifications about new messages |
 
-Passwords are handled by our authentication provider, Supabase. Forkop cannot read your password in plain text.
+Passwords are handled by our authentication provider, Supabase. Förköp cannot read your password in plain text.
 
 We do not use third-party advertising and do not collect location data or contacts from your device.
 
 ## 3. Legal Basis
 
-- **Performance of a contract:** account details, listings, chats, and other data needed to provide Forkop.
+- **Performance of a contract:** account details, listings, chats, and other data needed to provide Förköp.
 - **Legitimate interest:** reports, blocks, and processing necessary to prevent misuse and keep the service safe. Our interest is protecting users and the service.
 - **Consent:** push notifications are only sent if you allow notifications in your device settings. You can withdraw this permission at any time.
 

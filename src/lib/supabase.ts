@@ -36,6 +36,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE puts the auth code in the redirect URL's query string, which is
+    // what lets the password-reset deep link be read with useLocalSearchParams
+    // instead of having to hand-parse a URL fragment.
+    flowType: 'pkce',
     lock: processLock,
   },
 });

@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { Toast } from '@/components/toast';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -12,7 +13,7 @@ import { checkIsAdmin } from '@/lib/admin';
 import { pickAndUploadAvatar } from '@/lib/avatar';
 import { useAuth } from '@/lib/auth';
 import { Language, useI18n } from '@/lib/i18n';
-import { fetchOwnSwishNumber, saveOwnSwishNumber } from '@/lib/payment-details';
+import { INVALID_SWISH_NUMBER, fetchOwnSwishNumber, saveOwnSwishNumber } from '@/lib/payment-details';
 import { disablePushNotifications, getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
 import { ThemeMode, useThemeMode } from '@/lib/theme-mode';
@@ -29,8 +30,7 @@ export default function SettingsScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.user_metadata?.avatar_url ?? null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [avatarToastVisible, setAvatarToastVisible] = useState(false);
-  const avatarToastOpacity = useRef(new Animated.Value(0)).current;
+  const [toast, setToast] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name ?? '');
   const [nameSaving, setNameSaving] = useState(false);
@@ -92,16 +92,6 @@ export default function SettingsScreen() {
       .catch(() => setIsAdmin(false));
   }, [user]);
 
-  function showAvatarToast() {
-    setAvatarToastVisible(true);
-    avatarToastOpacity.setValue(0);
-    Animated.sequence([
-      Animated.timing(avatarToastOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
-      Animated.delay(1400),
-      Animated.timing(avatarToastOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => setAvatarToastVisible(false));
-  }
-
   async function handleChangeAvatar() {
     if (!user || avatarUploading) return;
 
@@ -112,10 +102,10 @@ export default function SettingsScreen() {
       const url = await pickAndUploadAvatar(user.id);
       if (url) {
         setAvatarUrl(url);
-        showAvatarToast();
+        setToast(t('avatarToastMessage'));
       }
-    } catch (error) {
-      setAvatarError(error instanceof Error ? error.message : t('avatarChangeError'));
+    } catch {
+      setAvatarError(t('avatarChangeError'));
     } finally {
       setAvatarUploading(false);
     }
@@ -135,8 +125,8 @@ export default function SettingsScreen() {
 
       if (error) throw new Error(error.message);
       setNameSaved(true);
-    } catch (error) {
-      setNameError(error instanceof Error ? error.message : t('nameSaveError'));
+    } catch {
+      setNameError(t('nameSaveError'));
     } finally {
       setNameSaving(false);
     }
@@ -173,7 +163,11 @@ export default function SettingsScreen() {
       await saveOwnSwishNumber(user.id, swishNumber);
       setSwishSaved(true);
     } catch (error) {
-      setSwishError(error instanceof Error ? error.message : t('swishNumberSaveError'));
+      setSwishError(
+        error instanceof Error && error.message === INVALID_SWISH_NUMBER
+          ? t('swishNumberInvalid')
+          : t('swishNumberSaveError'),
+      );
     } finally {
       setSwishSaving(false);
     }
@@ -189,8 +183,8 @@ export default function SettingsScreen() {
       await saveOwnSwishNumber(user.id, '');
       setSwishNumber('');
       setSwishSaved(false);
-    } catch (error) {
-      setSwishError(error instanceof Error ? error.message : t('swishNumberSaveError'));
+    } catch {
+      setSwishError(t('swishNumberSaveError'));
     } finally {
       setSwishDeleting(false);
     }
@@ -214,8 +208,8 @@ export default function SettingsScreen() {
 
             await supabase.auth.signOut({ scope: 'local' });
             router.back();
-          } catch (error) {
-            setDeleteAccountError(error instanceof Error ? error.message : t('deleteAccountError'));
+          } catch {
+            setDeleteAccountError(t('deleteAccountError'));
           } finally {
             setDeletingAccount(false);
           }
@@ -237,8 +231,8 @@ export default function SettingsScreen() {
         await disablePushNotifications(user.id);
       }
       setPushEnabled(next);
-    } catch (error) {
-      setPushError(error instanceof Error ? error.message : t('pushToggleError'));
+    } catch {
+      setPushError(t('pushToggleError'));
     } finally {
       setPushSubmitting(false);
     }
@@ -246,16 +240,11 @@ export default function SettingsScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      {avatarToastVisible && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.avatarToast,
-            { top: safeAreaInsets.top + 56 + Spacing.two, opacity: avatarToastOpacity, backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected },
-          ]}>
-          <ThemedText style={styles.avatarToastText}>{t('avatarToastMessage')}</ThemedText>
-        </Animated.View>
-      )}
+      <Toast
+        message={toast}
+        onHidden={() => setToast(null)}
+        topOffset={safeAreaInsets.top + 56 + Spacing.two}
+      />
       <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -573,24 +562,6 @@ function SegmentedControl<T extends string>({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-  },
-  avatarToast: {
-    alignSelf: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    elevation: 4,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    position: 'absolute',
-    shadowColor: '#1D2430',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    zIndex: 10,
-  },
-  avatarToastText: {
-    fontSize: 14,
-    fontWeight: '800',
   },
   header: {
     borderBottomWidth: StyleSheet.hairlineWidth,

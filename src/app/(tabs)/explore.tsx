@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,14 +33,23 @@ const MAX_DISPLAY_NAME_LENGTH = 25;
 export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
-  const { initializing, user, signIn, signOut, signUp } = useAuth();
+  const { initializing, user, signIn, signOut, signUp, resetPasswordForEmail } = useAuth();
   const { t } = useI18n();
+  const params = useLocalSearchParams<{ confirmed?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(false);
+
+  useEffect(() => {
+    if (params.confirmed === '1') {
+      setJustConfirmed(true);
+    }
+  }, [params.confirmed]);
   const [signupFullName, setSignupFullName] = useState('');
   const [signupSwishNumber, setSignupSwishNumber] = useState('');
   const [listings, setListings] = useState<Listing[]>([]);
@@ -83,8 +92,8 @@ export default function ProfileScreen() {
 
     try {
       setListings(await fetchMyListings(user.id));
-    } catch (error) {
-      setListingsError(error instanceof Error ? error.message : t('listingFetchErrorSentence'));
+    } catch {
+      setListingsError(t('listingFetchErrorSentence'));
     } finally {
       setListingsLoading(false);
     }
@@ -177,14 +186,30 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim() || submitting) return;
+
+    setSubmitting(true);
+    setAuthError(null);
+
+    try {
+      await resetPasswordForEmail(email.trim());
+      setResetEmailSent(true);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : t('resetPasswordError'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSignOut() {
     setSubmitting(true);
     setAuthError(null);
 
     try {
       await signOut();
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : t('signOutError'));
+    } catch {
+      setAuthError(t('signOutError'));
     } finally {
       setSubmitting(false);
     }
@@ -201,8 +226,8 @@ export default function ProfileScreen() {
       await deleteListing(listingId, user.id);
       setListings((current) => current.filter((item) => item.id !== listingId));
       setDeleteCandidate(null);
-    } catch (error) {
-      setListingsError(error instanceof Error ? error.message : t('deleteListingError'));
+    } catch {
+      setListingsError(t('deleteListingError'));
     } finally {
       setPendingListingId(null);
     }
@@ -223,8 +248,8 @@ export default function ProfileScreen() {
       );
       setDeleteCandidate(null);
       setRatingListing(soldListing);
-    } catch (error) {
-      setListingsError(error instanceof Error ? error.message : t('markSoldError'));
+    } catch {
+      setListingsError(t('markSoldError'));
       setDeleteCandidate(null);
     } finally {
       setPendingListingId(null);
@@ -244,8 +269,8 @@ export default function ProfileScreen() {
         current.map((item) => (item.id === listing.id ? { ...item, isSold: false } : item)),
       );
       setDeleteCandidate(null);
-    } catch (error) {
-      setListingsError(error instanceof Error ? error.message : t('restoreListingError'));
+    } catch {
+      setListingsError(t('restoreListingError'));
       setDeleteCandidate(null);
     } finally {
       setPendingListingId(null);
@@ -306,7 +331,7 @@ export default function ProfileScreen() {
                 <View style={styles.profileCopy}>
                   <View style={styles.profileNameRow}>
                     <ThemedText numberOfLines={1} style={styles.profileName}>
-                      {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Forkop'}
+                      {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Förköp'}
                     </ThemedText>
                     {ownRatingSummary && (
                       <View style={styles.ownRatingBadge}>
@@ -376,21 +401,29 @@ export default function ProfileScreen() {
             <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
               <View style={styles.authHeader}>
                 <ThemedText style={styles.authTitle}>
-                  {mode === 'signin' ? t('signIn') : t('signUp')}
+                  {mode === 'signin' ? t('signIn') : mode === 'signup' ? t('signUp') : t('resetPasswordTitle')}
                 </ThemedText>
-                <Pressable
-                  onPress={() => {
-                    setMode(mode === 'signin' ? 'signup' : 'signin');
-                    setAuthError(null);
-                    setConfirmationEmailSent(false);
-                    setSignupFullName('');
-                    setSignupSwishNumber('');
-                  }}>
-                  <ThemedText style={styles.authSwitch}>
-                    {mode === 'signin' ? t('signUp') : t('signIn')}
-                  </ThemedText>
-                </Pressable>
+                {mode !== 'forgot' && (
+                  <Pressable
+                    onPress={() => {
+                      setMode(mode === 'signin' ? 'signup' : 'signin');
+                      setAuthError(null);
+                      setConfirmationEmailSent(false);
+                      setSignupFullName('');
+                      setSignupSwishNumber('');
+                    }}>
+                    <ThemedText style={styles.authSwitch}>
+                      {mode === 'signin' ? t('signUp') : t('signIn')}
+                    </ThemedText>
+                  </Pressable>
+                )}
               </View>
+
+              {mode === 'signin' && justConfirmed && (
+                <ThemedText type="small" style={styles.confirmationNotice}>
+                  {t('accountConfirmedNotice')}
+                </ThemedText>
+              )}
 
               {confirmationEmailSent && (
                 <ThemedText type="small" style={styles.confirmationNotice}>
@@ -398,83 +431,153 @@ export default function ProfileScreen() {
                 </ThemedText>
               )}
 
-              <TextInput
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                onChangeText={(text) => {
-                  setEmail(text);
-                  setConfirmationEmailSent(false);
-                }}
-                placeholder="Email"
-                placeholderTextColor={theme.textSecondary}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.background,
-                    borderColor: theme.backgroundSelected,
-                    color: theme.text,
-                  },
-                ]}
-                value={email}
-              />
-              <TextInput
-                autoCapitalize="none"
-                onChangeText={setPassword}
-                placeholder={t('password')}
-                placeholderTextColor={theme.textSecondary}
-                secureTextEntry
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.background,
-                    borderColor: theme.backgroundSelected,
-                    color: theme.text,
-                  },
-                ]}
-                value={password}
-              />
+              {mode === 'forgot' ? (
+                <>
+                  {resetEmailSent ? (
+                    <ThemedText type="small" style={styles.confirmationNotice}>
+                      {t('resetLinkSentNotice')}
+                    </ThemedText>
+                  ) : (
+                    <>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {t('resetPasswordInstructions')}
+                      </ThemedText>
+                      <TextInput
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        keyboardType="email-address"
+                        onChangeText={setEmail}
+                        placeholder="Email"
+                        placeholderTextColor={theme.textSecondary}
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: theme.background,
+                            borderColor: theme.backgroundSelected,
+                            color: theme.text,
+                          },
+                        ]}
+                        value={email}
+                      />
 
-              {mode === 'signup' && (
+                      {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
+
+                      <Pressable
+                        disabled={submitting || !email.trim()}
+                        onPress={handleForgotPassword}
+                        style={[
+                          styles.primaryButton,
+                          { opacity: submitting || !email.trim() ? 0.55 : 1 },
+                        ]}>
+                        <ThemedText style={styles.primaryButtonText}>
+                          {submitting ? t('wait') : t('sendResetLink')}
+                        </ThemedText>
+                      </Pressable>
+                    </>
+                  )}
+
+                  <Pressable
+                    onPress={() => {
+                      setMode('signin');
+                      setAuthError(null);
+                      setResetEmailSent(false);
+                    }}>
+                    <ThemedText style={styles.authSwitch}>{t('backToSignIn')}</ThemedText>
+                  </Pressable>
+                </>
+              ) : (
                 <>
                   <TextInput
-                    maxLength={MAX_DISPLAY_NAME_LENGTH}
-                    onChangeText={(text) => setSignupFullName(text.replace(/[^\p{L}\s]/gu, ''))}
-                    placeholder={t('displayNameOptionalPlaceholder')}
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setConfirmationEmailSent(false);
+                    }}
+                    placeholder="Email"
                     placeholderTextColor={theme.textSecondary}
                     style={[
                       styles.input,
-                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.backgroundSelected,
+                        color: theme.text,
+                      },
                     ]}
-                    value={signupFullName}
+                    value={email}
                   />
                   <TextInput
-                    keyboardType="phone-pad"
-                    onChangeText={(text) => setSignupSwishNumber(text.replace(/[^\d\s+-]/g, ''))}
-                    placeholder={t('swishNumberOptionalPlaceholder')}
+                    autoCapitalize="none"
+                    onChangeText={setPassword}
+                    placeholder={t('password')}
                     placeholderTextColor={theme.textSecondary}
+                    secureTextEntry
                     style={[
                       styles.input,
-                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.backgroundSelected,
+                        color: theme.text,
+                      },
                     ]}
-                    value={signupSwishNumber}
+                    value={password}
                   />
+
+                  {mode === 'signin' && (
+                    <Pressable
+                      onPress={() => {
+                        setMode('forgot');
+                        setAuthError(null);
+                        setResetEmailSent(false);
+                      }}
+                      style={styles.forgotPasswordLink}>
+                      <ThemedText style={styles.authSwitch}>{t('forgotPassword')}</ThemedText>
+                    </Pressable>
+                  )}
+
+                  {mode === 'signup' && (
+                    <>
+                      <TextInput
+                        maxLength={MAX_DISPLAY_NAME_LENGTH}
+                        onChangeText={(text) => setSignupFullName(text.replace(/[^\p{L}\s]/gu, ''))}
+                        placeholder={t('displayNameOptionalPlaceholder')}
+                        placeholderTextColor={theme.textSecondary}
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                        ]}
+                        value={signupFullName}
+                      />
+                      <TextInput
+                        keyboardType="phone-pad"
+                        onChangeText={(text) => setSignupSwishNumber(text.replace(/[^\d\s+-]/g, ''))}
+                        placeholder={t('swishNumberOptionalPlaceholder')}
+                        placeholderTextColor={theme.textSecondary}
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                        ]}
+                        value={signupSwishNumber}
+                      />
+                    </>
+                  )}
+
+                  {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
+
+                  <Pressable
+                    disabled={submitting || !email.trim() || !password}
+                    onPress={handleAuthSubmit}
+                    style={[
+                      styles.primaryButton,
+                      { opacity: submitting || !email.trim() || !password ? 0.55 : 1 },
+                    ]}>
+                    <ThemedText style={styles.primaryButtonText}>
+                      {submitting ? t('wait') : mode === 'signin' ? t('signIn') : t('signUp')}
+                    </ThemedText>
+                  </Pressable>
                 </>
               )}
-
-              {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
-
-              <Pressable
-                disabled={submitting || !email.trim() || !password}
-                onPress={handleAuthSubmit}
-                style={[
-                  styles.primaryButton,
-                  { opacity: submitting || !email.trim() || !password ? 0.55 : 1 },
-                ]}>
-                <ThemedText style={styles.primaryButtonText}>
-                  {submitting ? t('wait') : mode === 'signin' ? t('signIn') : t('signUp')}
-                </ThemedText>
-              </Pressable>
             </View>
           )}
         </View>
@@ -820,6 +923,9 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,
+  },
+  forgotPasswordLink: {
+    alignSelf: 'flex-end',
   },
   authSwitch: {
     color: '#4F6FB7',

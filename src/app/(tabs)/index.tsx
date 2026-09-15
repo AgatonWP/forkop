@@ -17,12 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { ChatModal } from '@/components/chat-modal';
 import { Logo } from '@/components/logo';
 import { getNationImage } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
+import { Toast } from '@/components/toast';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -89,6 +90,18 @@ export default function HomeScreen() {
   const [listingsLoading, setListingsLoading] = useState(true);
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ confirmed?: string }>();
+
+  // Set by the signup-confirmation deep link once the session is established.
+  // Guarded by a ref rather than clearing the param, because a cold start on
+  // the deep link runs this before the navigator is ready to be touched.
+  const confirmedToastShown = useRef(false);
+  useEffect(() => {
+    if (params.confirmed !== '1' || confirmedToastShown.current) return;
+    confirmedToastShown.current = true;
+    setToast(t('accountConfirmedToast'));
+  }, [params.confirmed, t]);
 
   const loadListings = useCallback(async (isActive: () => boolean = () => true, showInitialLoader = false) => {
     if (showInitialLoader) {
@@ -100,9 +113,9 @@ export default function HomeScreen() {
       if (!isActive()) return;
       setListings(items);
       setListingsError(null);
-    } catch (error) {
+    } catch {
       if (!isActive()) return;
-      setListingsError(error instanceof Error ? error.message : t('listingFetchErrorSentence'));
+      setListingsError(t('listingFetchErrorSentence'));
     } finally {
       if (!isActive()) return;
       setListingsLoading(false);
@@ -219,6 +232,11 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
+      <Toast
+        message={toast}
+        onHidden={() => setToast(null)}
+        topOffset={insets.top + Spacing.six}
+      />
       <SafeAreaView style={styles.safeArea} edges={[]}>
         <View
           style={[

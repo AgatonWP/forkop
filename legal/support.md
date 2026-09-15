@@ -1,6 +1,6 @@
-# Support för Forkop
+# Support för Förköp
 
-Behöver du hjälp med Forkop, vill rapportera ett problem eller lämna feedback?
+Behöver du hjälp med Förköp, vill rapportera ett problem eller lämna feedback?
 
 Kontakta:
 

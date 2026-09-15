@@ -7,7 +7,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import { Conversation, Message, fetchConversationsForListing, fetchLatestMessages } from '@/lib/messages';
-import { submitRating } from '@/lib/ratings';
+import { ALREADY_RATED, submitRating } from '@/lib/ratings';
 import { Listing } from '@/lib/tickets';
 
 const RATING_OPTIONS: { score: number; rotation: number; labelKey: TranslationKey }[] = [
@@ -65,7 +65,7 @@ export function RatingModal({ listing, onClose, onSubmitted }: Props) {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err instanceof Error ? err.message : t('ratingSubmitError'));
+        setError(t('ratingSubmitError'));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -86,8 +86,12 @@ export function RatingModal({ listing, onClose, onSubmitted }: Props) {
       await submitRating(listing.id, user.id, selectedBuyerId, score);
       onSubmitted?.();
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('ratingSubmitError'));
+    } catch (error) {
+      setError(
+        error instanceof Error && error.message === ALREADY_RATED
+          ? t('ratingAlreadyExists')
+          : t('ratingSubmitError'),
+      );
     } finally {
       setSubmitting(false);
     }

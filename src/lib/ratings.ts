@@ -31,6 +31,8 @@ function mapRating(row: RatingRow): Rating {
   };
 }
 
+export const ALREADY_RATED = 'ALREADY_RATED';
+
 export async function submitRating(
   listingId: string,
   raterId: string,
@@ -42,7 +44,8 @@ export async function submitRating(
     .insert({ listing_id: listingId, rater_id: raterId, rated_user_id: ratedUserId, score });
 
   if (error) {
-    throw new Error(error.message);
+    // 23505 is the unique (listing_id) index: this listing is already rated.
+    throw new Error(error.code === '23505' ? ALREADY_RATED : error.message);
   }
 }
 

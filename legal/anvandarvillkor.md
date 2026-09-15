@@ -1,12 +1,12 @@
-# Användarvillkor för Forkop
+# Användarvillkor för Förköp
 
 Senast uppdaterade: 27 augusti 2026
 
-Dessa villkor gäller när du skapar ett konto eller använder Forkop. Genom att använda tjänsten godkänner du villkoren.
+Dessa villkor gäller när du skapar ett konto eller använder Förköp. Genom att använda tjänsten godkänner du villkoren.
 
 ## 1. Om tjänsten
 
-Forkop tillhandahålls av Agaton Westman Prage och är en digital mötesplats där användare kan lägga upp, hitta, köpa, sälja och byta biljetter. Forkop förmedlar kontakten men är inte part i någon överenskommelse, biljettöverlåtelse eller betalning mellan användare.
+Förköp tillhandahålls av Agaton Westman Prage och är en digital mötesplats där användare kan lägga upp, hitta, köpa, sälja och byta biljetter. Förköp förmedlar kontakten men är inte part i någon överenskommelse, biljettöverlåtelse eller betalning mellan användare.
 
 ## 2. Konto och behörighet
 
@@ -20,7 +20,7 @@ Forkop tillhandahålls av Agaton Westman Prage och är en digital mötesplats d�
 - Du får bara annonsera sådant som du har rätt att sälja eller byta och måste beskriva det sanningsenligt.
 - Kontrollera själv att en biljett får överlåtas och följ arrangörens villkor samt tillämplig lag.
 - Olagligt, vilseledande, hotfullt, kränkande, diskriminerande eller rättighetsintrångande innehåll är förbjudet. Spam, bedrägeriförsök och trakasserier är också förbjudna.
-- Du behåller rättigheterna till ditt innehåll men ger oss en icke-exklusiv rätt att lagra och visa det i den utsträckning som behövs för att driva Forkop.
+- Du behåller rättigheterna till ditt innehåll men ger oss en icke-exklusiv rätt att lagra och visa det i den utsträckning som behövs för att driva Förköp.
 - Vi får granska rapporter och ta bort innehåll eller begränsa konton som bryter mot villkoren eller innebär risk för användare eller tjänsten.
 
 ## 4. Kontakt, rapportering och blockering
@@ -29,9 +29,9 @@ Användare kan kommunicera via appens chatt. Du kan rapportera en annons eller a
 
 ## 5. Betalningar och biljetter
 
-- Betalningar, exempelvis via Swish, sker direkt mellan köpare och säljare utanför Forkop. Vi tar inte emot, håller eller återbetalar pengar.
+- Betalningar, exempelvis via Swish, sker direkt mellan köpare och säljare utanför Förköp. Vi tar inte emot, håller eller återbetalar pengar.
 - Du ansvarar själv för att kontrollera motparten, biljettens äkthet, överlåtbarhet, pris och leverans innan du betalar eller lämnar över en biljett.
-- Forkop garanterar inte att en annons är korrekt, att en biljett är giltig eller att en affär slutförs.
+- Förköp garanterar inte att en annons är korrekt, att en biljett är giltig eller att en affär slutförs.
 
 ## 6. Omdömen
 
@@ -39,15 +39,15 @@ Omdömen ska bygga på en faktisk kontakt eller affär och lämnas sakligt och i
 
 ## 7. Tillgänglighet och ansvar
 
-Forkop tillhandahålls i befintligt skick och tjänsten kan ibland vara otillgänglig eller innehålla fel. I den utsträckning lagen tillåter ansvarar vi inte för användares handlingar, biljettens giltighet, uteblivna affärer, betalningstvister eller indirekta skador. Detta begränsar inte ansvar som följer av tvingande lag.
+Förköp tillhandahålls i befintligt skick och tjänsten kan ibland vara otillgänglig eller innehålla fel. I den utsträckning lagen tillåter ansvarar vi inte för användares handlingar, biljettens giltighet, uteblivna affärer, betalningstvister eller indirekta skador. Detta begränsar inte ansvar som följer av tvingande lag.
 
 ## 8. Avstängning och avslut
 
-Du kan när som helst sluta använda Forkop och radera ditt konto i appens inställningar. Vi får ta bort innehåll, begränsa funktioner eller stänga av ett konto vid brott mot villkoren, misstänkt missbruk, säkerhetsrisk eller rättslig skyldighet.
+Du kan när som helst sluta använda Förköp och radera ditt konto i appens inställningar. Vi får ta bort innehåll, begränsa funktioner eller stänga av ett konto vid brott mot villkoren, misstänkt missbruk, säkerhetsrisk eller rättslig skyldighet.
 
 ## 9. Ändringar och tjänstens upphörande
 
-Vi kan utveckla, ändra eller avsluta hela eller delar av Forkop. Om villkoren ändras väsentligt informerar vi i appen eller på annat lämpligt sätt. Fortsatt användning efter att nya villkor börjat gälla innebär att de nya villkoren accepteras.
+Vi kan utveckla, ändra eller avsluta hela eller delar av Förköp. Om villkoren ändras väsentligt informerar vi i appen eller på annat lämpligt sätt. Fortsatt användning efter att nya villkor börjat gälla innebär att de nya villkoren accepteras.
 
 ## 10. Tillämplig lag och tvist
 

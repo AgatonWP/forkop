@@ -69,8 +69,8 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
         details,
       });
       setDone(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kunde inte skicka rapporten.');
+    } catch {
+      setError('Kunde inte skicka rapporten.');
     } finally {
       setSubmitting(false);
     }
