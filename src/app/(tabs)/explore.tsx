@@ -25,6 +25,7 @@ import {
   saveOwnSwishNumber,
 } from '@/lib/payment-details';
 import { useThemeMode } from '@/lib/theme-mode';
+import { useTicketWatches } from '@/lib/ticket-watches';
 import { Rating, RatingSummary, fetchOwnRatingsForListings, fetchRatingSummary } from '@/lib/ratings';
 import {
   Listing,
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const { t } = useI18n();
   const params = useLocalSearchParams<{ confirmed?: string }>();
   const { verifiedOrganizerIdFor } = useVerifiedOrganizers();
+  const { watches } = useTicketWatches();
   const verifiedOrganizerId = user ? verifiedOrganizerIdFor(user.id) : undefined;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -445,6 +447,34 @@ export default function ProfileScreen() {
                   <ThemedText style={styles.outlineButtonText}>{t('signOut')}</ThemedText>
                 </Pressable>
               </View>
+
+              {/* Watches used to live in Settings, where nobody found them. */}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/watches')}
+                style={({ pressed }) => [
+                  styles.watchesRow,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.backgroundSelected,
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}>
+                <View style={[styles.watchesIcon, { backgroundColor: theme.backgroundSelected }]}>
+                  <Ionicons color={theme.text} name="notifications-outline" size={18} />
+                </View>
+                <View style={styles.watchesCopy}>
+                  <ThemedText style={styles.watchesTitle}>
+                    {watches.length > 0 ? `${t('watchesTitle')} (${watches.length})` : t('watchesTitle')}
+                  </ThemedText>
+                  <ThemedText numberOfLines={2} type="small" themeColor="textSecondary">
+                    {t('watchesLinkCopy')}
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.watchesChevron} themeColor="textSecondary">
+                  ›
+                </ThemedText>
+              </Pressable>
 
               <ProfileSection title={t('activeListings')} count={activeListings.length}>
                 {listingsLoading ? (
@@ -1229,6 +1259,36 @@ const styles = StyleSheet.create({
   outlineButtonText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  watchesRow: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: Spacing.two,
+    minHeight: 62,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  watchesIcon: {
+    alignItems: 'center',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  watchesCopy: {
+    flex: 1,
+    gap: 1,
+  },
+  watchesTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  watchesChevron: {
+    fontSize: 22,
+    lineHeight: 24,
   },
   section: {
     gap: Spacing.two,
