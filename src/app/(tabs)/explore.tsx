@@ -4,7 +4,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, LayoutAnimation, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NationEmblem } from '@/components/nation-emblem';
@@ -18,7 +18,12 @@ import { useAuth } from '@/lib/auth';
 import { MIN_PASSWORD_LENGTH, authErrorKey, describeAuthError } from '@/lib/auth-errors';
 import { useI18n } from '@/lib/i18n';
 import { getNation } from '@/lib/nations';
-import { saveOwnSwishNumber } from '@/lib/payment-details';
+import {
+  MAX_SWISH_DIGITS,
+  countSwishDigits,
+  hasPlausibleSwishLength,
+  saveOwnSwishNumber,
+} from '@/lib/payment-details';
 import { useThemeMode } from '@/lib/theme-mode';
 import { Rating, RatingSummary, fetchOwnRatingsForListings, fetchRatingSummary } from '@/lib/ratings';
 import {
@@ -161,10 +166,24 @@ export default function ProfileScreen() {
     };
   }, [soldListings]);
 
+  // Signing up asks for four things, which is a wall of empty fields to land
+  // on. Only the email shows until there is something in it; the rest follows
+  // once the choice to use email rather than Apple or Google has been made.
+  const signupExpanded = mode === 'signup' && email.trim().length > 0;
+  const passwordFieldVisible = mode === 'signin' || signupExpanded;
+
   // Supabase rejects a short password with an English error; catching it here
   // keeps the requirement visible before the user ever presses the button.
   const passwordTooShort = mode === 'signup' && password.length < MIN_PASSWORD_LENGTH;
-  const canSubmitAuth = !submitting && !!email.trim() && !!password && !passwordTooShort;
+  const swishNumberInvalid =
+    signupSwishNumber.trim().length > 0 && !hasPlausibleSwishLength(signupSwishNumber);
+  const canSubmitAuth =
+    !submitting && !!email.trim() && !!password && !passwordTooShort && !swishNumberInvalid;
+
+  useEffect(() => {
+    // Lets the extra fields slide in rather than appear mid-keystroke.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [signupExpanded]);
 
   async function handleAuthSubmit() {
     if (!canSubmitAuth) return;
@@ -563,25 +582,27 @@ export default function ProfileScreen() {
                     ]}
                     value={email}
                   />
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={setPassword}
-                    placeholder={t('password')}
-                    placeholderTextColor={theme.textSecondary}
-                    secureTextEntry
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: theme.background,
-                        borderColor: theme.backgroundSelected,
-                        color: theme.text,
-                      },
-                    ]}
-                    value={password}
-                  />
+                  {passwordFieldVisible && (
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={setPassword}
+                      placeholder={mode === 'signup' ? t('passwordSignupPlaceholder') : t('password')}
+                      placeholderTextColor={theme.textSecondary}
+                      secureTextEntry
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.background,
+                          borderColor: theme.backgroundSelected,
+                          color: theme.text,
+                        },
+                      ]}
+                      value={password}
+                    />
+                  )}
 
-                  {mode === 'signup' && (
-                    <ThemedText type="small" themeColor="textSecondary">
+                  {passwordTooShort && password.length > 0 && (
+                    <ThemedText type="small" style={styles.fieldHint}>
                       {t('passwordMinHint')}
                     </ThemedText>
                   )}
@@ -598,7 +619,7 @@ export default function ProfileScreen() {
                     </Pressable>
                   )}
 
-                  {mode === 'signup' && (
+                  {signupExpanded && (
                     <>
                       <TextInput
                         maxLength={MAX_DISPLAY_NAME_LENGTH}
@@ -613,7 +634,14 @@ export default function ProfileScreen() {
                       />
                       <TextInput
                         keyboardType="phone-pad"
-                        onChangeText={(text) => setSignupSwishNumber(text.replace(/[^\d\s+-]/g, ''))}
+                        onChangeText={(text) => {
+                          const cleaned = text.replace(/[^\d\s+-]/g, '');
+                          // Stop at 15 digits rather than letting a typo run on:
+                          // no phone number anywhere is longer than that.
+                          if (countSwishDigits(cleaned) <= MAX_SWISH_DIGITS) {
+                            setSignupSwishNumber(cleaned);
+                          }
+                        }}
                         placeholder={t('swishNumberOptionalPlaceholder')}
                         placeholderTextColor={theme.textSecondary}
                         style={[
@@ -622,6 +650,12 @@ export default function ProfileScreen() {
                         ]}
                         value={signupSwishNumber}
                       />
+
+                      {swishNumberInvalid && (
+                        <ThemedText type="small" style={styles.fieldHint}>
+                          {t('swishNumberLengthHint')}
+                        </ThemedText>
+                      )}
                     </>
                   )}
 
@@ -1056,6 +1090,10 @@ const styles = StyleSheet.create({
     color: '#1F1F1F',
     fontSize: 17,
     fontWeight: '600',
+  },
+  fieldHint: {
+    color: '#B4553B',
+    marginTop: -Spacing.one,
   },
   forgotPasswordLink: {
     alignSelf: 'flex-end',

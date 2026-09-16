@@ -14,7 +14,13 @@ import { AVATAR_PERMISSION_DENIED, AVATAR_TOO_LARGE, pickAndUploadAvatar } from 
 import { useAuth } from '@/lib/auth';
 import { MIN_PASSWORD_LENGTH, authErrorKey } from '@/lib/auth-errors';
 import { Language, useI18n } from '@/lib/i18n';
-import { INVALID_SWISH_NUMBER, fetchOwnSwishNumber, saveOwnSwishNumber } from '@/lib/payment-details';
+import {
+  INVALID_SWISH_NUMBER,
+  MAX_SWISH_DIGITS,
+  countSwishDigits,
+  fetchOwnSwishNumber,
+  saveOwnSwishNumber,
+} from '@/lib/payment-details';
 import { disablePushNotifications, getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
 import { ThemeMode, useThemeMode } from '@/lib/theme-mode';
@@ -341,7 +347,10 @@ export default function SettingsScreen() {
                 <View style={styles.nameInputRow}>
                   <TextInput
                     onChangeText={(text) => {
-                      setSwishNumber(text.replace(/[^\d\s+-]/g, ''));
+                      const cleaned = text.replace(/[^\d\s+-]/g, '');
+                      // Same ceiling as the signup field: E.164 allows 15 digits.
+                      if (countSwishDigits(cleaned) > MAX_SWISH_DIGITS) return;
+                      setSwishNumber(cleaned);
                       setSwishSaved(false);
                     }}
                     placeholder={t('swishNumberPlaceholder')}
