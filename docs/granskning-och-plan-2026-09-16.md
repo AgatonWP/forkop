@@ -56,8 +56,11 @@ Genomfört i koden, testat och redo att byggas:
 - **2/P2 Anon-åtkomst.** `supabase/migrations/20260916130000_restrict_anon_access.sql`
   tar bort utloggades läsrättighet på allt utom `listings` och
   `verified_organizers`.
-- **2/S6 Profilbilder.** Endast jpeg/png/webp/heic tillåts (en publik
-  SVG-uppladdning var möjlig tidigare), max 5 MB, med begripliga felmeddelanden.
+- **2/S6 Profilbilder.** Skalas om till 512 px JPEG i appen före uppladdning
+  (~40–80 kB i stället för 50–500 kB), EXIF/GPS försvinner, en publik
+  SVG-uppladdning är inte längre möjlig, och gamla filer med annan filändelse
+  städas bort. Bandbredden är den verkliga kostnaden: en avatar hämtas på
+  varje annonskort.
 - **2/S2 (delvis).** `contact_method`/`contact_info` läses inte längre av
   appen, vilket är förutsättningen för att kunna droppa kolumnerna.
 - **Integritetspolicyn** nämner nu Resend, Apple/Google-inloggning och
@@ -274,7 +277,9 @@ egen biljettyp 30) så användaren aldrig träffar constrainten.
 
 **S4. Auth-inställningar i Supabase Dashboard.**
 - Password → minsta längd 8 (uppdatera texten i 1.1 och klientkontrollen).
-- Password → slå på "Leaked password protection" (HaveIBeenPwned).
+- ~~Password → slå på "Leaked password protection" (HaveIBeenPwned).~~ Kräver
+  Pro-planen. Hoppas över tills vidare; 8-teckenskravet är den fria delen av
+  samma skydd.
 - Rate Limits → se 1.1.
 - Email → OTP/länk-giltighet: 1 timme räcker.
 
@@ -288,11 +293,18 @@ skicka `sha256(nonce)` till `AppleAuthentication.signInAsync({ nonce })` resp.
 `supabase.auth.signInWithIdToken({ ..., nonce })`. Slå sedan av "Skip nonce
 check". Testa på riktig enhet – kräver ny build.
 
-**S6. Profilbilder utan gränser.** `uploadAvatarImage` skickar valfri MIME-typ
-och storlek till en publik bucket. Sätt i Storage → avatars: max 5 MB och
-tillåtna typer `image/jpeg, image/png, image/webp, image/heic`. Komprimera i
-appen med `expo-image-manipulator` till max 512×512 JPEG innan upload (sparar
-även bandbredd).
+**S6. Profilbilder utan gränser.** ~~`uploadAvatarImage` skickar valfri
+MIME-typ och storlek till en publik bucket.~~ **Gjort i koden:** appen skalar
+om till 512 px och sparar som JPEG (kvalitet 0,7) före uppladdning, vilket
+landar på ~40–80 kB oavsett källbild, alltid som `avatar.jpg`, och städar bort
+filer från tidigare filändelser. Omkodningen tar bort EXIF (inklusive
+GPS-position) som annars hamnat i en publik bucket.
+
+Kvar i dashboarden: Storage → avatars → **2 MB** som skyddsnät (inte 500 kB —
+användare som ännu kör 1.0.2 laddar upp originalbilden och skulle nekas), och
+tillåtna typer `image/jpeg, image/png, image/webp, image/heic` så länge 1.0.2
+finns ute. När 1.0.3 rullat ut kan taket sänkas till 1 MB och typerna till
+enbart `image/jpeg`.
 
 **S7. Rategräns på rapporter och nya chattar.** `reports` kan spammas
 (ingen gräns); `conversations` kan öppnas mot alla annonser i en loop. Samma
