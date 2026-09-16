@@ -48,7 +48,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "postinstall": "node scripts/patch-expo-shims.js",
-    "build:ios": "bash scripts/build-ios.sh"
+    "build:ios": "bash scripts/build-ios.sh",
+    "submit:ios": "bash scripts/submit-ios.sh"
   },
   "private": true
 }
