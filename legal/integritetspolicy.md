@@ -41,12 +41,15 @@ Valfria profiluppgifter och Swish-nummer lämnas frivilligt och kan tas bort i a
 - Profilbilder lagras i en publikt läsbar bildlagring för att kunna visas i appen.
 - Chattar visas endast för deltagarna i respektive konversation.
 - Ett sparat Swish-nummer visas endast för kontoinnehavaren och för en köpare som har en faktisk konversation med säljaren.
+- Bevakningar du skapar syns bara för dig. De används enbart för att skicka en notis när en ny annons matchar det du bevakar.
 - Omdömen kan visas för andra användare, medan rapporter och blockeringar inte visas offentligt.
 
 Vi anlitar följande personuppgiftsbiträden:
 
 - **Supabase** för autentisering, databas, fillagring och serverfunktioner.
 - **Expo** för appinfrastruktur och leverans av pushnotiser.
+- **Resend** för utskick av kontomejl, till exempel bekräftelselänkar och återställning av lösenord.
+- **Apple** respektive **Google** om du väljer att logga in med Apple-ID eller Google-konto. Vi tar då emot din e-postadress och, om du delar det, ditt namn och din profilbild.
 
 Leverantörerna behandlar uppgifter enligt sina villkor och dataskyddsåtaganden. Vi säljer inte personuppgifter och delar dem inte med annonsnätverk.
 

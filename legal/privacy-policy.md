@@ -41,12 +41,15 @@ Optional profile details and your Swish number are provided voluntarily and can 
 - Profile pictures are stored in publicly readable file storage so they can be displayed in the app.
 - Chats are only shown to the participants of that conversation.
 - A saved Swish number is only shown to the account holder and to a buyer who has an actual conversation with the seller.
+- Watches you create are visible only to you. They are used solely to notify you when a new listing matches what you are watching.
 - Ratings may be shown to other users, while reports and blocks are never shown publicly.
 
 We use the following data processors:
 
 - **Supabase** for authentication, database, file storage, and server functions.
 - **Expo** for app infrastructure and delivery of push notifications.
+- **Resend** for sending account email, such as confirmation links and password resets.
+- **Apple** and **Google** if you choose to sign in with an Apple ID or a Google account. We then receive your email address and, if you share it, your name and profile picture.
 
 These providers process data according to their own terms and data protection commitments. We never sell personal data and never share it with advertising networks.
 
