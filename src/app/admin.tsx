@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,31 +8,55 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { checkIsAdmin } from '@/lib/admin';
-import { getNation } from '@/lib/nations';
+import { SELECTABLE_NATIONS_LIST, getNation } from '@/lib/nations';
 import { AdminReport, dismissReport, fetchOpenReports } from '@/lib/reports';
 import { adminDeleteListing, fetchAllListingsAdmin, getListingOrganizerName, Listing } from '@/lib/tickets';
+import {
+  NO_ACCOUNT_WITH_EMAIL,
+  VerifiedOrganizerAccount,
+  adminListVerifiedOrganizers,
+  adminRevokeOrganizer,
+  adminVerifyOrganizer,
+  useVerifiedOrganizers,
+} from '@/lib/verified-organizers';
+
+// "Annat" isn't a real organizer, and the database rejects verifying it.
+const VERIFIABLE_ORGANIZERS = SELECTABLE_NATIONS_LIST.filter(({ id }) => id !== 'other');
 
 export default function AdminScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
+  const { refresh: refreshVerifiedOrganizers } = useVerifiedOrganizers();
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [organizers, setOrganizers] = useState<VerifiedOrganizerAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [verifyOrganizerId, setVerifyOrganizerId] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const canVerify = !!verifyOrganizerId && verifyEmail.trim().length > 0 && !verifying;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [reportRows, listingRows] = await Promise.all([fetchOpenReports(), fetchAllListingsAdmin()]);
+      const [reportRows, listingRows, organizerRows] = await Promise.all([
+        fetchOpenReports(),
+        fetchAllListingsAdmin(),
+        adminListVerifiedOrganizers(),
+      ]);
       setReports(reportRows);
       setListings(listingRows);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kunde inte hämta data.');
+      setOrganizers(organizerRows);
+    } catch {
+      setError('Kunde inte hämta data.');
     } finally {
       setLoading(false);
     }
@@ -47,6 +71,59 @@ export default function AdminScreen() {
       .catch(() => setAuthorized(false));
   }, [load]);
 
+  async function handleVerify() {
+    if (!canVerify || !verifyOrganizerId) return;
+
+    setVerifying(true);
+    setVerifyError(null);
+
+    try {
+      await adminVerifyOrganizer(verifyEmail.trim(), verifyOrganizerId);
+      setVerifyEmail('');
+      setVerifyOrganizerId(null);
+      refreshVerifiedOrganizers();
+      adminListVerifiedOrganizers()
+        .then(setOrganizers)
+        .catch(() => {
+          // The verification itself succeeded; the list just catches up on the next load.
+        });
+    } catch (err) {
+      setVerifyError(
+        err instanceof Error && err.message === NO_ACCOUNT_WITH_EMAIL
+          ? 'Det finns inget konto med den mejladressen. Arrangören behöver skapa ett konto i appen först.'
+          : 'Kunde inte verifiera kontot.',
+      );
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  function handleRevoke(account: VerifiedOrganizerAccount) {
+    Alert.alert(
+      'Återkalla verifiering',
+      `${account.email} förlorar märkningen för ${getNation(account.organizerId).name}.`,
+      [
+        { text: 'Avbryt', style: 'cancel' },
+        {
+          text: 'Återkalla',
+          style: 'destructive',
+          onPress: async () => {
+            setBusyId(account.userId);
+            try {
+              await adminRevokeOrganizer(account.userId);
+              setOrganizers((prev) => prev.filter((item) => item.userId !== account.userId));
+              refreshVerifiedOrganizers();
+            } catch {
+              Alert.alert('Fel', 'Kunde inte återkalla verifieringen.');
+            } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   function handleDeleteListing(listingId: string) {
     Alert.alert('Ta bort annons', 'Annonsen och alla dess chattar tas bort permanent. Detta går inte att ångra.', [
       { text: 'Avbryt', style: 'cancel' },
@@ -59,8 +136,8 @@ export default function AdminScreen() {
             await adminDeleteListing(listingId);
             setListings((prev) => prev.filter((listing) => listing.id !== listingId));
             setReports((prev) => prev.filter((report) => report.listingId !== listingId));
-          } catch (err) {
-            Alert.alert('Fel', err instanceof Error ? err.message : 'Kunde inte ta bort annonsen.');
+          } catch {
+            Alert.alert('Fel', 'Kunde inte ta bort annonsen.');
           } finally {
             setBusyId(null);
           }
@@ -74,8 +151,8 @@ export default function AdminScreen() {
     try {
       await dismissReport(reportId);
       setReports((prev) => prev.filter((report) => report.id !== reportId));
-    } catch (err) {
-      Alert.alert('Fel', err instanceof Error ? err.message : 'Kunde inte avfärda rapporten.');
+    } catch {
+      Alert.alert('Fel', 'Kunde inte avfärda rapporten.');
     } finally {
       setBusyId(null);
     }
@@ -102,6 +179,7 @@ export default function AdminScreen() {
         </View>
       ) : (
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           style={[styles.scrollView, { backgroundColor: theme.background }]}
           contentContainerStyle={[
             styles.contentContainer,
@@ -114,6 +192,79 @@ export default function AdminScreen() {
               <ThemedText style={styles.errorText}>{error}</ThemedText>
             ) : (
               <>
+                <View style={styles.section}>
+                  <ThemedText style={styles.sectionTitle}>Verifierade arrangörskonton ({organizers.length})</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    Bekräfta alltid via kontaktuppgifterna på arrangörens egen hemsida innan du verifierar, aldrig via
+                    uppgifterna i förfrågan.
+                  </ThemedText>
+
+                  <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                    <TextInput
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      keyboardType="email-address"
+                      onChangeText={(text) => {
+                        setVerifyEmail(text);
+                        setVerifyError(null);
+                      }}
+                      placeholder="Kontots mejladress"
+                      placeholderTextColor={theme.textSecondary}
+                      style={[
+                        styles.input,
+                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      ]}
+                      value={verifyEmail}
+                    />
+
+                    <View style={styles.chipRow}>
+                      {VERIFIABLE_ORGANIZERS.map((organizer) => {
+                        const selected = organizer.id === verifyOrganizerId;
+                        return (
+                          <Pressable
+                            key={organizer.id}
+                            onPress={() => setVerifyOrganizerId(organizer.id)}
+                            style={[
+                              styles.chip,
+                              { borderColor: theme.backgroundSelected },
+                              selected && styles.chipSelected,
+                            ]}>
+                            <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                              {organizer.name}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {verifyError && <ThemedText style={styles.errorText}>{verifyError}</ThemedText>}
+
+                    <Pressable
+                      disabled={!canVerify}
+                      onPress={handleVerify}
+                      style={[styles.primaryButton, !canVerify && styles.buttonDisabled]}>
+                      <ThemedText style={styles.primaryButtonText}>{verifying ? 'Verifierar...' : 'Verifiera'}</ThemedText>
+                    </Pressable>
+                  </View>
+
+                  {organizers.map((account) => (
+                    <View
+                      key={account.userId}
+                      style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                      <ThemedText style={styles.cardTitle}>{getNation(account.organizerId).name}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {account.email} · verifierad {account.verifiedAt.toLocaleDateString('sv-SE')}
+                      </ThemedText>
+                      <Pressable
+                        disabled={busyId === account.userId}
+                        onPress={() => handleRevoke(account)}
+                        style={[styles.destructiveButton, styles.selfEndButton, busyId === account.userId && styles.buttonDisabled]}>
+                        <ThemedText style={styles.destructiveButtonText}>Återkalla</ThemedText>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+
                 <View style={styles.section}>
                   <ThemedText style={styles.sectionTitle}>Rapporterade annonser ({reports.length})</ThemedText>
 
@@ -255,6 +406,50 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  input: {
+    borderRadius: 8,
+    borderWidth: 1,
+    fontSize: 16,
+    marginBottom: Spacing.one,
+    minHeight: 44,
+    paddingHorizontal: Spacing.three,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+  },
+  chip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 5,
+  },
+  chipSelected: {
+    backgroundColor: '#2F74E0',
+    borderColor: '#2F74E0',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
+  },
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#1D2430',
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: Spacing.one,
+    minHeight: 42,
+    paddingHorizontal: Spacing.three,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   rowButtons: {
     flexDirection: 'row',

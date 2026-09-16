@@ -94,6 +94,8 @@ export async function getOrCreateConversation(
     .single();
 
   if (insertError) {
+    // 23W05 comes from enforce_conversation_limits() in 20260916120000_content_limits.sql.
+    if (insertError.code === '23W05') throw new ConversationRateLimitError(insertError.message);
     throw new Error(insertError.message);
   }
 
@@ -183,6 +185,12 @@ export async function fetchLatestMessages(
   return latest;
 }
 
+/** Raised when the rate-limit trigger in the database rejects a message. */
+export class MessageRateLimitError extends Error {}
+
+/** Raised when the buyer has opened too many new conversations in an hour. */
+export class ConversationRateLimitError extends Error {}
+
 export async function sendMessage(conversationId: string, senderId: string, text: string): Promise<Message> {
   const { data, error } = await supabase
     .from('messages')
@@ -191,6 +199,9 @@ export async function sendMessage(conversationId: string, senderId: string, text
     .single();
 
   if (error) {
+    // P0001 is enforce_message_rate_limit() saying the sender is going too
+    // fast — worth telling them apart from "the message didn't go through".
+    if (error.code === 'P0001') throw new MessageRateLimitError(error.message);
     throw new Error(error.message);
   }
 

@@ -10,8 +10,9 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { checkIsAdmin } from '@/lib/admin';
-import { pickAndUploadAvatar } from '@/lib/avatar';
+import { AVATAR_PERMISSION_DENIED, AVATAR_TOO_LARGE, pickAndUploadAvatar } from '@/lib/avatar';
 import { useAuth } from '@/lib/auth';
+import { MIN_PASSWORD_LENGTH, authErrorKey } from '@/lib/auth-errors';
 import { Language, useI18n } from '@/lib/i18n';
 import { INVALID_SWISH_NUMBER, fetchOwnSwishNumber, saveOwnSwishNumber } from '@/lib/payment-details';
 import { disablePushNotifications, getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
@@ -104,8 +105,15 @@ export default function SettingsScreen() {
         setAvatarUrl(url);
         setToast(t('avatarToastMessage'));
       }
-    } catch {
-      setAvatarError(t('avatarChangeError'));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : '';
+      setAvatarError(
+        reason === AVATAR_PERMISSION_DENIED
+          ? t('avatarPermissionDenied')
+          : reason === AVATAR_TOO_LARGE
+            ? t('avatarTooLarge')
+            : t('avatarChangeError'),
+      );
     } finally {
       setAvatarUploading(false);
     }
@@ -133,7 +141,7 @@ export default function SettingsScreen() {
   }
 
   async function handleChangePassword() {
-    if (!user || passwordSaving || newPassword.length < 6) return;
+    if (!user || passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH) return;
 
     setPasswordSaving(true);
     setPasswordError(null);
@@ -146,7 +154,8 @@ export default function SettingsScreen() {
       setPasswordSaved(true);
       setNewPassword('');
     } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : t('passwordSaveError'));
+      const key = authErrorKey(error);
+      setPasswordError(key === 'authGenericError' ? t('passwordSaveError') : t(key));
     } finally {
       setPasswordSaving(false);
     }
@@ -399,6 +408,21 @@ export default function SettingsScreen() {
                 )}
               </View>
               {pushError && <ThemedText style={styles.errorText}>{pushError}</ThemedText>}
+
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => router.push('./watches')}
+                style={styles.switchRow}>
+                <View style={styles.switchCopy}>
+                  <ThemedText style={styles.switchTitle}>{t('watchesLink')}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('watchesLinkCopy')}
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.legalChevron} themeColor="textSecondary">
+                  ›
+                </ThemedText>
+              </Pressable>
             </View>
           </View>
 
@@ -476,9 +500,9 @@ export default function SettingsScreen() {
                     value={newPassword}
                   />
                   <Pressable
-                    disabled={passwordSaving || newPassword.length < 6}
+                    disabled={passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH}
                     onPress={handleChangePassword}
-                    style={[styles.saveButton, { opacity: passwordSaving || newPassword.length < 6 ? 0.55 : 1 }]}>
+                    style={[styles.saveButton, { opacity: passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH ? 0.55 : 1 }]}>
                     <ThemedText style={styles.saveButtonText}>
                       {passwordSaving ? t('savingLabel') : passwordSaved ? t('savedLabel') : t('saveNameButton')}
                     </ThemedText>

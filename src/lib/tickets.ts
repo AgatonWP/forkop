@@ -1,5 +1,36 @@
 import { getNation } from '@/lib/nations';
+import { TranslationKey } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+
+/**
+ * Postgres speaks in constraint names and SQLSTATEs ("new row violates
+ * row-level security policy for table \"listings\""). None of that belongs on
+ * a user's screen, so every failure a listing insert can produce is named
+ * here. 23W02/23W03 are ours, raised by the triggers in
+ * 20260916120000_content_limits.sql.
+ */
+export function listingErrorKey(error: unknown): TranslationKey {
+  const code = (error as { code?: string } | null)?.code;
+
+  switch (code) {
+    case '42501':
+      return 'listingSessionExpired';
+    case '23514':
+    case '22001':
+    case '23502':
+      return 'listingInvalidContent';
+    case '23W02':
+      return 'listingRateLimited';
+    case '23W03':
+      return 'listingLimitReached';
+    default:
+      return 'listingCreateError';
+  }
+}
+
+export function describeListingError(error: unknown, t: (key: TranslationKey) => string): string {
+  return t(listingErrorKey(error));
+}
 
 export type DealType = 'sell' | 'trade' | 'both';
 
@@ -14,8 +45,6 @@ export type Listing = {
   price?: number;
   tradeDescription?: string;
   description: string;
-  contactMethod: string;
-  contactInfo: string;
   createdAt: Date;
   updatedAt: Date;
   isHot?: boolean;
@@ -73,8 +102,6 @@ type ListingRow = {
   price: number | string | null;
   trade_description: string | null;
   description: string | null;
-  contact_method: string | null;
-  contact_info: string | null;
   created_at: string;
   updated_at: string;
   nation_id: string;
@@ -84,7 +111,7 @@ type ListingRow = {
 };
 
 const LISTING_COLUMNS =
-  'id,user_id,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,contact_method,contact_info,created_at,updated_at,nation_id,status,seller_name,seller_avatar_url';
+  'id,user_id,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,created_at,updated_at,nation_id,status,seller_name,seller_avatar_url';
 
 export function parseListingEventDate(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -133,8 +160,6 @@ function mapListing(row: ListingRow): Listing {
     price: row.price == null ? undefined : Number(row.price),
     tradeDescription: row.trade_description ?? undefined,
     description: row.description ?? '',
-    contactMethod: row.contact_method ?? '',
-    contactInfo: row.contact_info ?? '',
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     isSold: row.status === 'sold',

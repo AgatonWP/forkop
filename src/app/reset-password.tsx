@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useI18n } from '@/lib/i18n';
+import { MIN_PASSWORD_LENGTH, authErrorKey } from '@/lib/auth-errors';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -44,19 +45,20 @@ export default function ResetPasswordScreen() {
   }, [code]);
 
   async function handleSubmit() {
-    if (submitting || newPassword.length < 6) return;
+    if (submitting || newPassword.length < MIN_PASSWORD_LENGTH) return;
 
     setSubmitting(true);
     setError(null);
 
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
 
       setDone(true);
       setTimeout(() => router.replace('/'), 1200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('passwordSaveError'));
+      const key = authErrorKey(err);
+      setError(key === 'authGenericError' ? t('passwordSaveError') : t(key));
     } finally {
       setSubmitting(false);
     }
@@ -109,9 +111,9 @@ export default function ResetPasswordScreen() {
             {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
             <Pressable
-              disabled={submitting || newPassword.length < 6}
+              disabled={submitting || newPassword.length < MIN_PASSWORD_LENGTH}
               onPress={handleSubmit}
-              style={[styles.button, { opacity: submitting || newPassword.length < 6 ? 0.55 : 1 }]}>
+              style={[styles.button, { opacity: submitting || newPassword.length < MIN_PASSWORD_LENGTH ? 0.55 : 1 }]}>
               <ThemedText style={styles.buttonText}>
                 {submitting ? t('wait') : t('updatePasswordButton')}
               </ThemedText>

@@ -19,7 +19,8 @@
           "swish"
         ],
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -55,7 +56,14 @@
         }
       ],
       "./plugins/with-fmt-xcode26-fix",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.327088324957-2nggu18as7c9gqc97ef3qinnjndml6ul"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -65,6 +73,10 @@
       "router": {},
       "eas": {
         "projectId": "72d048eb-2907-4d62-aa93-c2e57b09b1f1"
+      },
+      "google": {
+        "iosClientId": "327088324957-2nggu18as7c9gqc97ef3qinnjndml6ul.apps.googleusercontent.com",
+        "webClientId": "327088324957-lp0n4ad84ekn79fmnchhkg5ddejokele.apps.googleusercontent.com"
       }
     },
     "owner": "agatonwp"

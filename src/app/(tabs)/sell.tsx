@@ -27,6 +27,7 @@ import { SELECTABLE_NATIONS_LIST, getNation } from '@/lib/nations';
 import {
   DealType,
   MORE_THAN_MAX_TICKET_QUANTITY,
+  describeListingError,
   formatListingEventDate,
   formatTicketQuantity,
   toLocalDateId,
@@ -41,6 +42,9 @@ const QUANTITY_OPTIONS = Array.from({ length: MORE_THAN_MAX_TICKET_QUANTITY }, (
   };
 });
 const MAX_TICKET_PRICE = 3000;
+const MAX_ORGANIZER_LENGTH = 40;
+const MAX_CUSTOM_TICKET_TYPE_LENGTH = 30;
+const MAX_DESCRIPTION_LENGTH = 1000;
 const DATE_OPTION_DAYS = 180;
 
 export default function SellScreen() {
@@ -216,7 +220,7 @@ export default function SellScreen() {
     setSubmitting(false);
 
     if (error) {
-      setSubmitError(error.message);
+      setSubmitError(describeListingError(error, t));
       return;
     }
 
@@ -305,6 +309,7 @@ export default function SellScreen() {
                 {nationId === 'other' && (
                   <TextInput
                     value={customOrganizer}
+                    maxLength={MAX_ORGANIZER_LENGTH}
                     onChangeText={setCustomOrganizer}
                     placeholder={t('organizerPlaceholder')}
                     placeholderTextColor={theme.textSecondary}
@@ -507,6 +512,7 @@ export default function SellScreen() {
                         {wantedNationId === 'other' && (
                           <TextInput
                             value={wantedCustomOrganizer}
+                            maxLength={MAX_ORGANIZER_LENGTH}
                             onChangeText={setWantedCustomOrganizer}
                             placeholder={t('organizerPlaceholder')}
                             placeholderTextColor={theme.textSecondary}
@@ -536,6 +542,7 @@ export default function SellScreen() {
               <FormSection label={t('optionalDescription')}>
                 <TextInput
                   value={description}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
                   onChangeText={setDescription}
                   placeholder={t('descriptionPlaceholder')}
                   placeholderTextColor={theme.textSecondary}
@@ -910,6 +917,7 @@ function SimplePickerModal({
                     </ThemedText>
                     <TextInput
                       value={customValue ?? ''}
+                      maxLength={MAX_CUSTOM_TICKET_TYPE_LENGTH}
                       onFocus={() => {
                         if (selectedId !== opt.id) onSelect(opt.id);
                       }}

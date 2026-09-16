@@ -78,9 +78,9 @@ export default function MessagesScreen() {
 
       if (!isActive()) return;
       setItems(nextItems);
-    } catch (err) {
+    } catch {
       if (!isActive()) return;
-      setError(err instanceof Error ? err.message : t('messagesFetchError'));
+      setError(t('messagesFetchError'));
     }
   }, [t, user]);
 

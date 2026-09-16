@@ -31,13 +31,17 @@ import {
   fetchMessages,
   getOrCreateConversation,
   sendMessage,
+  ConversationRateLimitError,
+  MessageRateLimitError,
   subscribeToMessages,
 } from '@/lib/messages';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
 import { Listing, formatListingEventDate, formatTicketQuantity, markListingSold } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
+import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 import { ReportModal } from '@/components/report-modal';
 import { RatingModal } from '@/components/rating-modal';
+import { VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
 import { blockUser, getBlockStatus, unblockUser } from '@/lib/blocking';
 import { clearDraft, linkDraftKey, readDraft, saveDraft } from '@/lib/chat-drafts';
 import { fetchSellerSwishNumber } from '@/lib/payment-details';
@@ -60,6 +64,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
   const { user } = useAuth();
   const { language, t } = useI18n();
   const { markConversationRead } = useUnreadMessages();
+  const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,7 +152,9 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
       })
       .catch((error) => {
         if (!active) return;
-        setLoadError(t('chatLoadError'));
+        setLoadError(
+          error instanceof ConversationRateLimitError ? t('chatStartRateLimited') : t('chatLoadError'),
+        );
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -234,8 +241,8 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
       setDraft('');
       if (draftKey) clearDraft(draftKey);
       setMessages((current) => (current.some((m) => m.id === message.id) ? current : [...current, message]));
-    } catch {
-      setSendError(t('chatSendError'));
+    } catch (error) {
+      setSendError(error instanceof MessageRateLimitError ? t('chatRateLimited') : t('chatSendError'));
     } finally {
       setSending(false);
     }
@@ -385,6 +392,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
   if (!listing) return null;
 
   const isSeller = !!user && listing.userId === user.id;
+  const showVerifiedBadge = !isSeller && isVerifiedOrganizerListing(listing);
   const otherPartyName = isSeller ? (conversation?.buyerName ?? t('buyer')) : (listing.sellerName ?? t('seller'));
   const otherPartyAvatarUrl = isSeller ? conversation?.buyerAvatarUrl : listing.sellerAvatarUrl;
   const listingMeta = [
@@ -431,9 +439,12 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
             </View>
           )}
           <View style={styles.headerCenter}>
-            <ThemedText numberOfLines={1} style={styles.headerTitle}>
-              {otherPartyName}
-            </ThemedText>
+            <View style={styles.headerTitleRow}>
+              <ThemedText numberOfLines={1} style={styles.headerTitle}>
+                {otherPartyName}
+              </ThemedText>
+              {showVerifiedBadge && <VerifiedOrganizerBadge />}
+            </View>
             <View style={styles.headerMetaRow}>
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.headerMetaText}>
                 {listingMeta}
@@ -711,7 +722,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  headerTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
   headerTitle: {
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '800',
     textTransform: 'uppercase',

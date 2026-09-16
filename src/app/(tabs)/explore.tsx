@@ -1,20 +1,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NationEmblem } from '@/components/nation-emblem';
 import { RatingModal } from '@/components/rating-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
 import { BottomTabInset, MaxContentWidth, SecondaryHeaderHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { MIN_PASSWORD_LENGTH, authErrorKey, describeAuthError } from '@/lib/auth-errors';
 import { useI18n } from '@/lib/i18n';
+import { getNation } from '@/lib/nations';
 import { saveOwnSwishNumber } from '@/lib/payment-details';
+import { useThemeMode } from '@/lib/theme-mode';
 import { Rating, RatingSummary, fetchOwnRatingsForListings, fetchRatingSummary } from '@/lib/ratings';
 import {
   Listing,
@@ -27,15 +32,20 @@ import {
   markListingSold,
   restoreListingActive,
 } from '@/lib/tickets';
+import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 
 const MAX_DISPLAY_NAME_LENGTH = 25;
 
 export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
-  const { initializing, user, signIn, signOut, signUp, resetPasswordForEmail } = useAuth();
+  const { initializing, user, signIn, signInWithApple, signInWithGoogle, signOut, signUp, resetPasswordForEmail } =
+    useAuth();
+  const { themeMode } = useThemeMode();
   const { t } = useI18n();
   const params = useLocalSearchParams<{ confirmed?: string }>();
+  const { verifiedOrganizerIdFor } = useVerifiedOrganizers();
+  const verifiedOrganizerId = user ? verifiedOrganizerIdFor(user.id) : undefined;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
@@ -151,8 +161,13 @@ export default function ProfileScreen() {
     };
   }, [soldListings]);
 
+  // Supabase rejects a short password with an English error; catching it here
+  // keeps the requirement visible before the user ever presses the button.
+  const passwordTooShort = mode === 'signup' && password.length < MIN_PASSWORD_LENGTH;
+  const canSubmitAuth = !submitting && !!email.trim() && !!password && !passwordTooShort;
+
   async function handleAuthSubmit() {
-    if (!email.trim() || !password) return;
+    if (!canSubmitAuth) return;
 
     setSubmitting(true);
     setAuthError(null);
@@ -180,7 +195,41 @@ export default function ProfileScreen() {
       }
       setPassword('');
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : t('authGenericError'));
+      setAuthError(describeAuthError(error, t));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleAppleSignIn() {
+    if (submitting) return;
+
+    setSubmitting(true);
+    setAuthError(null);
+
+    try {
+      await signInWithApple();
+    } catch (error) {
+      // Prefer a precise reason (no network, rate limited) over the generic
+      // provider message, which says nothing the user can act on.
+      const key = authErrorKey(error);
+      setAuthError(key === 'authGenericError' ? t('appleSignInError') : t(key));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    if (submitting) return;
+
+    setSubmitting(true);
+    setAuthError(null);
+
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      const key = authErrorKey(error);
+      setAuthError(key === 'authGenericError' ? t('googleSignInError') : t(key));
     } finally {
       setSubmitting(false);
     }
@@ -196,7 +245,8 @@ export default function ProfileScreen() {
       await resetPasswordForEmail(email.trim());
       setResetEmailSent(true);
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : t('resetPasswordError'));
+      const key = authErrorKey(error);
+      setAuthError(key === 'authGenericError' ? t('resetPasswordError') : t(key));
     } finally {
       setSubmitting(false);
     }
@@ -349,6 +399,12 @@ export default function ProfileScreen() {
                   <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
                     {user.email}
                   </ThemedText>
+                  {verifiedOrganizerId && (
+                    <VerifiedOrganizerBadge
+                      organizerName={getNation(verifiedOrganizerId).name}
+                      style={styles.profileVerifiedBadge}
+                    />
+                  )}
                 </View>
                 <Pressable
                   disabled={submitting}
@@ -524,6 +580,12 @@ export default function ProfileScreen() {
                     value={password}
                   />
 
+                  {mode === 'signup' && (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {t('passwordMinHint')}
+                    </ThemedText>
+                  )}
+
                   {mode === 'signin' && (
                     <Pressable
                       onPress={() => {
@@ -566,16 +628,57 @@ export default function ProfileScreen() {
                   {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
 
                   <Pressable
-                    disabled={submitting || !email.trim() || !password}
+                    disabled={!canSubmitAuth}
                     onPress={handleAuthSubmit}
-                    style={[
-                      styles.primaryButton,
-                      { opacity: submitting || !email.trim() || !password ? 0.55 : 1 },
-                    ]}>
+                    style={[styles.primaryButton, { opacity: canSubmitAuth ? 1 : 0.55 }]}>
                     <ThemedText style={styles.primaryButtonText}>
                       {submitting ? t('wait') : mode === 'signin' ? t('signIn') : t('signUp')}
                     </ThemedText>
                   </Pressable>
+
+                  {Platform.OS === 'ios' && (
+                    <>
+                      <ThemedText type="small" themeColor="textSecondary" style={styles.authDivider}>
+                        {t('orDivider')}
+                      </ThemedText>
+                      <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={
+                          mode === 'signup'
+                            ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                            : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                        }
+                        buttonStyle={
+                          themeMode === 'dark'
+                            ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                            : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                        }
+                        cornerRadius={8}
+                        onPress={handleAppleSignIn}
+                        style={styles.appleButton}
+                      />
+                      <Pressable
+                        disabled={submitting}
+                        onPress={handleGoogleSignIn}
+                        style={({ pressed }) => [
+                          styles.googleButton,
+                          {
+                            // Google's white button carries a border so it reads as a
+                            // button on light backgrounds; on dark it stands on its own.
+                            borderColor: themeMode === 'dark' ? '#FFFFFF' : '#747775',
+                            opacity: pressed || submitting ? 0.7 : 1,
+                          },
+                        ]}>
+                        <Image
+                          contentFit="contain"
+                          source={require('@/assets/images/google-g.png')}
+                          style={styles.googleLogo}
+                        />
+                        <ThemedText style={styles.googleButtonText}>
+                          {mode === 'signup' ? t('signUpWithGoogle') : t('signInWithGoogle')}
+                        </ThemedText>
+                      </Pressable>
+                    </>
+                  )}
                 </>
               )}
             </View>
@@ -883,6 +986,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  profileVerifiedBadge: {
+    marginTop: Spacing.one,
+  },
   profileNameRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -923,6 +1029,33 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '800',
     lineHeight: 27,
+  },
+  authDivider: {
+    alignSelf: 'center',
+  },
+  appleButton: {
+    height: 46,
+    width: '100%',
+  },
+  googleButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: Spacing.one,
+    height: 46,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  googleLogo: {
+    height: 18,
+    width: 18,
+  },
+  googleButtonText: {
+    color: '#1F1F1F',
+    fontSize: 17,
+    fontWeight: '600',
   },
   forgotPasswordLink: {
     alignSelf: 'flex-end',

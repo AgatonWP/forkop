@@ -4,11 +4,29 @@ import { supabase } from '@/lib/supabase';
 
 export type PickedAvatar = { uri: string; mimeType?: string };
 
+export const AVATAR_PERMISSION_DENIED = 'AVATAR_PERMISSION_DENIED';
+export const AVATAR_TOO_LARGE = 'AVATAR_TOO_LARGE';
+
+/** Mirrors the bucket's own limit, so the user hears about it before the upload. */
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+// Anything outside this list would end up as a public file with an
+// attacker-chosen content type (SVG being the classic one), so unknown types
+// are stored as plain JPEG instead.
+const ALLOWED_MIME_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+};
+
 export async function pickAvatarImage(): Promise<PickedAvatar | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
   if (!permission.granted) {
-    throw new Error('Du behöver tillåta åtkomst till bildbiblioteket för att välja en profilbild.');
+    throw new Error(AVATAR_PERMISSION_DENIED);
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -27,14 +45,19 @@ export async function pickAvatarImage(): Promise<PickedAvatar | null> {
 }
 
 export async function uploadAvatarImage(userId: string, image: PickedAvatar): Promise<string> {
-  const extension = image.mimeType?.split('/')[1] ?? 'jpg';
+  const mimeType = image.mimeType && ALLOWED_MIME_TYPES[image.mimeType] ? image.mimeType : 'image/jpeg';
+  const extension = ALLOWED_MIME_TYPES[mimeType];
   const path = `${userId}/avatar.${extension}`;
 
   const response = await fetch(image.uri);
   const arrayBuffer = await response.arrayBuffer();
 
+  if (arrayBuffer.byteLength > MAX_AVATAR_BYTES) {
+    throw new Error(AVATAR_TOO_LARGE);
+  }
+
   const { error: uploadError } = await supabase.storage.from('avatars').upload(path, arrayBuffer, {
-    contentType: image.mimeType ?? 'image/jpeg',
+    contentType: mimeType,
     upsert: true,
   });
 

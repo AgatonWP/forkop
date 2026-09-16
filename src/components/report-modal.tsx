@@ -16,7 +16,13 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
-import { REPORT_REASONS, ReportReason, ReportTargetType, submitReport } from '@/lib/reports';
+import {
+  REPORT_RATE_LIMITED,
+  REPORT_REASONS,
+  ReportReason,
+  ReportTargetType,
+  submitReport,
+} from '@/lib/reports';
 import { Listing } from '@/lib/tickets';
 
 type Props = {
@@ -69,8 +75,12 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
         details,
       });
       setDone(true);
-    } catch {
-      setError('Kunde inte skicka rapporten.');
+    } catch (error) {
+      setError(
+        error instanceof Error && error.message === REPORT_RATE_LIMITED
+          ? 'Du har skickat många rapporter idag. Försök igen imorgon.'
+          : 'Kunde inte skicka rapporten.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -147,6 +157,7 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
 
                 <TextInput
                   value={details}
+                  maxLength={1000}
                   onChangeText={setDetails}
                   placeholder="Beskriv gärna vad som hänt (valfritt)"
                   placeholderTextColor={theme.textSecondary}

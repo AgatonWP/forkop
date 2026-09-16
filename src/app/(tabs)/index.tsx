@@ -1,6 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   FlatList,
@@ -24,18 +27,28 @@ import { Logo } from '@/components/logo';
 import { getNationImage } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { Toast } from '@/components/toast';
+import { VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import { NATIONS_LIST, getNation, nationMatchesQuery, normalizeSearchText } from '@/lib/nations';
+import { getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
+import {
+  TicketWatchFilters,
+  WATCH_LIMIT_REACHED,
+  canBeWatched,
+  useTicketWatches,
+} from '@/lib/ticket-watches';
+import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 import { ReportModal } from '@/components/report-modal';
 import {
   Listing,
   daysFromToday,
   fetchActiveListings,
+  fetchListingsByIds,
   formatListingEventDate,
   formatRelativeTime,
   formatTicketQuantity,
@@ -70,6 +83,9 @@ export default function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { language, t } = useI18n();
+  const { user } = useAuth();
+  const { addWatch, removeWatch, findWatch } = useTicketWatches();
+  const [watchSubmitting, setWatchSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [nationFilter, setNationFilter] = useState<string | null>(null);
   const [nationPickerOpen, setNationPickerOpen] = useState(false);
@@ -230,6 +246,126 @@ export default function HomeScreen() {
       });
   }, [nationFilter, ticketTypeFilter, dealFilter, dayFilter, listings, search]);
 
+  // The free-text search is left out on purpose: it matches loosely on event
+  // names and nation aliases, which would make it impossible to tell what a
+  // watch will actually notify about.
+  const watchFilters = useMemo<TicketWatchFilters>(
+    () => ({
+      nationId: nationFilter,
+      ticketType: ticketTypeFilter,
+      dealType: dealFilter,
+      eventDates: Array.from(dayFilter).sort(),
+    }),
+    [nationFilter, ticketTypeFilter, dealFilter, dayFilter],
+  );
+  const existingWatch = findWatch(watchFilters);
+
+  const createWatch = useCallback(async () => {
+    setWatchSubmitting(true);
+
+    try {
+      await addWatch(watchFilters);
+      setToast(t('watchCreatedToast'));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : '';
+      setToast(reason === WATCH_LIMIT_REACHED ? t('watchLimitToast') : t('watchSaveError'));
+    } finally {
+      setWatchSubmitting(false);
+    }
+  }, [addWatch, t, watchFilters]);
+
+  async function handleToggleWatch() {
+    if (watchSubmitting || !canBeWatched(watchFilters)) return;
+
+    if (!user) {
+      setToast(t('watchSignInRequired'));
+      return;
+    }
+
+    if (existingWatch) {
+      setWatchSubmitting(true);
+      try {
+        await removeWatch(existingWatch.id);
+        setToast(t('watchRemovedToast'));
+      } catch {
+        setToast(t('watchDeleteError'));
+      } finally {
+        setWatchSubmitting(false);
+      }
+      return;
+    }
+
+    let pushEnabled = false;
+    try {
+      pushEnabled = await getPushEnabled(user.id);
+    } catch {
+      pushEnabled = false;
+    }
+
+    // A watch belongs to the account, not to this device, so the browser can
+    // still save one for the phone to be notified about.
+    if (pushEnabled || Platform.OS === 'web') {
+      await createWatch();
+      return;
+    }
+
+    Alert.alert(t('watchNeedsPushTitle'), t('watchNeedsPushCopy'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('watchNeedsPushConfirm'),
+        onPress: async () => {
+          setWatchSubmitting(true);
+          try {
+            await registerForPushNotifications(user.id);
+          } catch (error) {
+            setToast(error instanceof Error ? error.message : t('pushToggleError'));
+            return;
+          } finally {
+            setWatchSubmitting(false);
+          }
+
+          await createWatch();
+        },
+      },
+    ]);
+  }
+
+  // A watch notification should land on the ticket it is about.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    let active = true;
+
+    async function openNotifiedListing(response: Notifications.NotificationResponse) {
+      const data = response.notification.request.content.data as {
+        type?: string;
+        listingId?: string;
+      };
+
+      if (data?.type !== 'watch' || typeof data.listingId !== 'string') return;
+
+      // Otherwise the same tap reopens the listing on every later launch.
+      await Notifications.clearLastNotificationResponseAsync();
+
+      try {
+        const [listing] = await fetchListingsByIds([data.listingId]);
+        if (active && listing) setSelectedListing(listing);
+      } catch {
+        // Sold or removed in the meantime; the list itself is still correct.
+      }
+    }
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) openNotifiedListing(response);
+    });
+    const subscription = Notifications.addNotificationResponseReceivedListener(openNotifiedListing);
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
   return (
     <ThemedView style={[styles.screen, Platform.OS === 'web' && webGradient as any]}>
       <Toast
@@ -329,11 +465,39 @@ export default function HomeScreen() {
                 />
               </View>
 
-              <ThemedText type="small" themeColor="textSecondary">
-                {listingsLoading
-                  ? t('loadingListings')
-                  : `${filteredListings.length} ${filteredListings.length === 1 ? t('listing') : t('listings')}`}
-              </ThemedText>
+              <View style={styles.resultRow}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {listingsLoading
+                    ? t('loadingListings')
+                    : `${filteredListings.length} ${filteredListings.length === 1 ? t('listing') : t('listings')}`}
+                </ThemedText>
+
+                {canBeWatched(watchFilters) && (
+                  <Pressable
+                    accessibilityLabel={existingWatch ? t('watchActiveButton') : t('watchButton')}
+                    disabled={watchSubmitting}
+                    onPress={handleToggleWatch}
+                    style={({ pressed }) => [
+                      styles.watchButton,
+                      {
+                        backgroundColor: existingWatch ? '#4F6FB7' : theme.backgroundElement,
+                        borderColor: existingWatch ? '#4F6FB7' : theme.backgroundSelected,
+                        opacity: pressed || watchSubmitting ? 0.7 : 1,
+                      },
+                    ]}>
+                    <Ionicons
+                      color={existingWatch ? '#FFFFFF' : theme.textSecondary}
+                      name={existingWatch ? 'notifications' : 'notifications-outline'}
+                      size={13}
+                    />
+                    <ThemedText
+                      type="smallBold"
+                      style={{ color: existingWatch ? '#FFFFFF' : theme.textSecondary }}>
+                      {existingWatch ? t('watchActiveButton') : t('watchButton')}
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </View>
             </View>
           }
           renderItem={({ item }) => (
@@ -708,6 +872,7 @@ function DayFilterCalendarModal({
 function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const theme = useTheme();
   const { language, t } = useI18n();
+  const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
   const nation = getNation(listing.nationId);
   const nationImage = getNationImage(listing.nationId);
   const useLogoWatermark = listing.nationId === 'mejeriet';
@@ -769,6 +934,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         </View>
 
         <View style={styles.badgeRow}>
+          {isVerifiedOrganizerListing(listing) && <VerifiedOrganizerBadge />}
           {(listing.dealType === 'sell' || listing.dealType === 'both') && (
             <View style={[styles.badge, styles.sellBadge]}>
               <ThemedText style={styles.sellBadgeText}>
@@ -813,6 +979,8 @@ function ListingModal({
   const nationName = listing ? getListingOrganizerName(listing) : '';
   const titleText = listing ? listing.ticketType : '';
   const isOwnListing = !!user && !!listing && listing.userId === user.id;
+  const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
+  const showVerifiedBadge = !!listing && isVerifiedOrganizerListing(listing);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
 
   useEffect(() => {
@@ -930,6 +1098,7 @@ function ListingModal({
                       <ThemedText type="small" themeColor="textSecondary">
                         {t('postedBy')} {listing.sellerName}
                       </ThemedText>
+                      {showVerifiedBadge && <VerifiedOrganizerBadge />}
                       {ratingSummary && (
                         <View style={styles.sellerRatingBadge}>
                           <ThemedText
@@ -1082,6 +1251,21 @@ const styles = StyleSheet.create({
   filters: {
     gap: Spacing.two,
     marginBottom: Spacing.one,
+  },
+  resultRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.two,
+    justifyContent: 'space-between',
+  },
+  watchButton: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
   },
   searchInput: {
     borderRadius: 8,

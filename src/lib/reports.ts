@@ -12,6 +12,9 @@ export const REPORT_REASONS = [
 
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
+/** Raised when the reporter has filed too many reports in 24 hours. */
+export const REPORT_RATE_LIMITED = 'REPORT_RATE_LIMITED';
+
 export async function submitReport(params: {
   reporterId: string;
   listingId: string;
@@ -28,7 +31,8 @@ export async function submitReport(params: {
   });
 
   if (error) {
-    throw new Error(error.message);
+    // 23W04 comes from enforce_report_limits() in 20260916120000_content_limits.sql.
+    throw new Error(error.code === '23W04' ? REPORT_RATE_LIMITED : error.message);
   }
 }
 
