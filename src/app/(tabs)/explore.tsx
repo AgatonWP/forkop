@@ -53,6 +53,8 @@ export default function ProfileScreen() {
   const verifiedOrganizerId = user ? verifiedOrganizerIdFor(user.id) : undefined;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordRepeat, setPasswordRepeat] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [submitting, setSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -177,8 +179,17 @@ export default function ProfileScreen() {
   const passwordTooShort = mode === 'signup' && password.length < MIN_PASSWORD_LENGTH;
   const swishNumberInvalid =
     signupSwishNumber.trim().length > 0 && !hasPlausibleSwishLength(signupSwishNumber);
+  // Only complain once the repeat has actually diverged: while it is still a
+  // prefix of the password the user is simply mid-word.
+  const passwordsDiverged = mode === 'signup' && !password.startsWith(passwordRepeat);
+  const passwordsMatch = mode === 'signup' && password.length > 0 && passwordRepeat === password;
   const canSubmitAuth =
-    !submitting && !!email.trim() && !!password && !passwordTooShort && !swishNumberInvalid;
+    !submitting &&
+    !!email.trim() &&
+    !!password &&
+    !passwordTooShort &&
+    !swishNumberInvalid &&
+    (mode !== 'signup' || passwordsMatch);
 
   useEffect(() => {
     // Lets the extra fields slide in rather than appear mid-keystroke.
@@ -213,6 +224,8 @@ export default function ProfileScreen() {
         setSignupSwishNumber('');
       }
       setPassword('');
+      setPasswordRepeat('');
+      setPasswordVisible(false);
     } catch (error) {
       setAuthError(describeAuthError(error, t));
     } finally {
@@ -486,6 +499,8 @@ export default function ProfileScreen() {
                       setConfirmationEmailSent(false);
                       setSignupFullName('');
                       setSignupSwishNumber('');
+                      setPasswordRepeat('');
+                      setPasswordVisible(false);
                     }}>
                     <ThemedText style={styles.authSwitch}>
                       {mode === 'signin' ? t('signUp') : t('signIn')}
@@ -583,28 +598,78 @@ export default function ProfileScreen() {
                     value={email}
                   />
                   {passwordFieldVisible && (
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={setPassword}
-                      placeholder={mode === 'signup' ? t('passwordSignupPlaceholder') : t('password')}
-                      placeholderTextColor={theme.textSecondary}
-                      secureTextEntry
-                      style={[
-                        styles.input,
-                        {
-                          backgroundColor: theme.background,
-                          borderColor: theme.backgroundSelected,
-                          color: theme.text,
-                        },
-                      ]}
-                      value={password}
-                    />
+                    <View style={styles.passwordField}>
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={setPassword}
+                        placeholder={mode === 'signup' ? t('passwordSignupPlaceholder') : t('password')}
+                        placeholderTextColor={theme.textSecondary}
+                        secureTextEntry={!passwordVisible}
+                        style={[
+                          styles.input,
+                          styles.passwordInput,
+                          {
+                            backgroundColor: theme.background,
+                            borderColor: theme.backgroundSelected,
+                            color: theme.text,
+                          },
+                        ]}
+                        value={password}
+                      />
+                      <Pressable
+                        accessibilityLabel={t(passwordVisible ? 'hidePassword' : 'showPassword')}
+                        accessibilityRole="button"
+                        hitSlop={8}
+                        onPress={() => setPasswordVisible((visible) => !visible)}
+                        style={styles.passwordToggle}>
+                        <Ionicons
+                          color={theme.textSecondary}
+                          name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                          size={20}
+                        />
+                      </Pressable>
+                    </View>
                   )}
 
                   {passwordTooShort && password.length > 0 && (
                     <ThemedText type="small" style={styles.fieldHint}>
                       {t('passwordMinHint')}
                     </ThemedText>
+                  )}
+
+                  {signupExpanded && password.length > 0 && (
+                    <>
+                      <View style={styles.passwordField}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={setPasswordRepeat}
+                          placeholder={t('repeatPasswordPlaceholder')}
+                          placeholderTextColor={theme.textSecondary}
+                          secureTextEntry={!passwordVisible}
+                          style={[
+                            styles.input,
+                            styles.passwordInput,
+                            {
+                              backgroundColor: theme.background,
+                              borderColor: passwordsMatch ? '#3F9A6A' : theme.backgroundSelected,
+                              color: theme.text,
+                            },
+                          ]}
+                          value={passwordRepeat}
+                        />
+                        {passwordsMatch && (
+                          <View style={styles.passwordToggle}>
+                            <Ionicons color="#3F9A6A" name="checkmark-circle" size={20} />
+                          </View>
+                        )}
+                      </View>
+
+                      {passwordsDiverged && (
+                        <ThemedText type="small" style={styles.fieldHint}>
+                          {t('passwordsDoNotMatch')}
+                        </ThemedText>
+                      )}
+                    </>
                   )}
 
                   {mode === 'signin' && (
@@ -1090,6 +1155,23 @@ const styles = StyleSheet.create({
     color: '#1F1F1F',
     fontSize: 17,
     fontWeight: '600',
+  },
+  passwordField: {
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  passwordInput: {
+    // Room for the eye, so a long password never runs under it.
+    paddingRight: 44,
+  },
+  passwordToggle: {
+    alignItems: 'center',
+    bottom: 0,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 44,
   },
   fieldHint: {
     color: '#B4553B',
