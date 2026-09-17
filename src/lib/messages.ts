@@ -10,7 +10,9 @@ export type Message = {
 
 export type Conversation = {
   id: string;
-  listingId: string;
+  /** Exactly one of listingId and lostItemId is set. */
+  listingId?: string;
+  lostItemId?: string;
   buyerId: string;
   sellerId: string;
   buyerName?: string;
@@ -20,7 +22,8 @@ export type Conversation = {
 
 type ConversationRow = {
   id: string;
-  listing_id: string;
+  listing_id: string | null;
+  lost_item_id: string | null;
   buyer_id: string;
   seller_id: string;
   buyer_name: string | null;
@@ -36,13 +39,15 @@ type MessageRow = {
   created_at: string;
 };
 
-const CONVERSATION_COLUMNS = 'id,listing_id,buyer_id,seller_id,buyer_name,buyer_avatar_url,created_at';
+const CONVERSATION_COLUMNS =
+  'id,listing_id,lost_item_id,buyer_id,seller_id,buyer_name,buyer_avatar_url,created_at';
 const MESSAGE_COLUMNS = 'id,conversation_id,sender_id,body,created_at';
 
 function mapConversation(row: ConversationRow): Conversation {
   return {
     id: row.id,
-    listingId: row.listing_id,
+    listingId: row.listing_id ?? undefined,
+    lostItemId: row.lost_item_id ?? undefined,
     buyerId: row.buyer_id,
     sellerId: row.seller_id,
     buyerName: row.buyer_name ?? undefined,
@@ -103,6 +108,49 @@ export async function getOrCreateConversation(
 }
 
 /** Seller-side (or reopen) entry point: fetches a known conversation by id. */
+/**
+ * The lost-and-found counterpart of getOrCreateConversation. seller_id is set
+ * by a trigger from the post's owner, so the caller cannot pick who it reaches.
+ */
+export async function getOrCreateLostItemConversation(
+  lostItemId: string,
+  starterId: string,
+  starterName?: string | null,
+  starterAvatarUrl?: string | null,
+): Promise<Conversation> {
+  const { data: existing, error: fetchError } = await supabase
+    .from('conversations')
+    .select(CONVERSATION_COLUMNS)
+    .eq('lost_item_id', lostItemId)
+    .eq('buyer_id', starterId)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw new Error(fetchError.message);
+  }
+  if (existing) {
+    return mapConversation(existing as ConversationRow);
+  }
+
+  const { data: created, error: insertError } = await supabase
+    .from('conversations')
+    .insert({
+      lost_item_id: lostItemId,
+      buyer_id: starterId,
+      buyer_name: starterName ?? null,
+      buyer_avatar_url: starterAvatarUrl ?? null,
+    })
+    .select(CONVERSATION_COLUMNS)
+    .single();
+
+  if (insertError) {
+    if (insertError.code === '23W05') throw new ConversationRateLimitError(insertError.message);
+    throw new Error(insertError.message);
+  }
+
+  return mapConversation(created as ConversationRow);
+}
+
 export async function fetchConversation(conversationId: string): Promise<Conversation> {
   const { data, error } = await supabase
     .from('conversations')

@@ -579,7 +579,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
                 <TextInput
                   value={draft}
                   onChangeText={handleDraftChange}
-                  placeholder="Skriv ett meddelande..."
+                  placeholder={t('writeMessage')}
                   placeholderTextColor={theme.textSecondary}
                   maxLength={MAX_MESSAGE_LENGTH}
                   multiline

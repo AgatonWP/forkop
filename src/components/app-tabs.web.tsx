@@ -28,6 +28,9 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>{t('buy')}</TabButton>
           </TabTrigger>
+          <TabTrigger name="lost" href="/lost" asChild>
+            <TabButton>{t('lostTab')}</TabButton>
+          </TabTrigger>
           <TabTrigger name="sell" href="/sell" asChild>
             <SellTabButton>+ {t('sell')}</SellTabButton>
           </TabTrigger>

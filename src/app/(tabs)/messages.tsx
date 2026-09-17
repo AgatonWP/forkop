@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Vie
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatModal } from '@/components/chat-modal';
+import { LostItemChatModal } from '@/components/lost-item-chat-modal';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -17,12 +18,23 @@ import {
   fetchConversationsForUser,
   fetchLatestMessages,
 } from '@/lib/messages';
+import {
+  LOST_ITEM_CATEGORY_EMOJI,
+  LOST_ITEM_CATEGORY_KEY,
+  LostItem,
+  fetchLostItemsByIds,
+} from '@/lib/lost-items';
 import { Listing, fetchListingsByIds, formatRelativeTime } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 
+/** A conversation is about a ticket listing or about a lost item, never both. */
+type InboxSubject =
+  | { kind: 'listing'; listing: Listing }
+  | { kind: 'lostItem'; lostItem: LostItem };
+
 type InboxItem = {
   conversation: Conversation;
-  listing: Listing;
+  subject: InboxSubject;
   lastMessage: Message | null;
   isSeller: boolean;
 };
@@ -49,22 +61,31 @@ export default function MessagesScreen() {
 
     try {
       const conversations = await fetchConversationsForUser(user.id);
-      const listingIds = [...new Set(conversations.map((c) => c.listingId))];
-      const [listings, latestByConversation] = await Promise.all([
+      const listingIds = [...new Set(conversations.map((c) => c.listingId).filter(Boolean) as string[])];
+      const lostItemIds = [...new Set(conversations.map((c) => c.lostItemId).filter(Boolean) as string[])];
+      const [listings, lostItems, latestByConversation] = await Promise.all([
         fetchListingsByIds(listingIds),
+        fetchLostItemsByIds(lostItemIds),
         fetchLatestMessages(conversations.map((c) => c.id), user.id),
       ]);
 
       const listingById = new Map(listings.map((listing) => [listing.id, listing]));
+      const lostItemById = new Map(lostItems.map((item) => [item.id, item]));
 
       const nextItems = conversations
         .map((conversation): InboxItem | null => {
-          const listing = listingById.get(conversation.listingId);
-          if (!listing) return null;
+          const listing = conversation.listingId ? listingById.get(conversation.listingId) : undefined;
+          const lostItem = conversation.lostItemId ? lostItemById.get(conversation.lostItemId) : undefined;
+          const subject: InboxSubject | null = listing
+            ? { kind: 'listing', listing }
+            : lostItem
+              ? { kind: 'lostItem', lostItem }
+              : null;
+          if (!subject) return null;
 
           return {
             conversation,
-            listing,
+            subject,
             lastMessage: latestByConversation.get(conversation.id) ?? null,
             isSeller: conversation.sellerId === user.id,
           };
@@ -192,19 +213,24 @@ export default function MessagesScreen() {
       )}
 
       <ChatModal
-        listing={openItem?.listing ?? null}
+        listing={openItem?.subject.kind === 'listing' ? openItem.subject.listing : null}
         conversationId={openItem?.conversation.id}
         onClose={() => setOpenItem(null)}
         onListingSold={(soldListing) => {
-          setItems((current) =>
-            current.map((item) =>
-              item.listing.id === soldListing.id ? { ...item, listing: soldListing } : item,
-            ),
-          );
-          setOpenItem((current) =>
-            current && current.listing.id === soldListing.id ? { ...current, listing: soldListing } : current,
-          );
+          const replace = (item: InboxItem): InboxItem =>
+            item.subject.kind === 'listing' && item.subject.listing.id === soldListing.id
+              ? { ...item, subject: { kind: 'listing', listing: soldListing } }
+              : item;
+
+          setItems((current) => current.map(replace));
+          setOpenItem((current) => (current ? replace(current) : current));
         }}
+      />
+
+      <LostItemChatModal
+        item={openItem?.subject.kind === 'lostItem' ? openItem.subject.lostItem : null}
+        conversationId={openItem?.conversation.id}
+        onClose={() => setOpenItem(null)}
       />
     </ThemedView>
   );
@@ -213,10 +239,23 @@ export default function MessagesScreen() {
 function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: boolean; onPress: () => void }) {
   const theme = useTheme();
   const { t } = useI18n();
-  const otherPartyName = item.isSeller ? (item.conversation.buyerName ?? t('buyer')) : (item.listing.sellerName ?? t('seller'));
+  const subject = item.subject;
+  const subjectLabel =
+    subject.kind === 'listing'
+      ? subject.listing.eventName
+      : `${LOST_ITEM_CATEGORY_EMOJI[subject.lostItem.category]} ${t(LOST_ITEM_CATEGORY_KEY[subject.lostItem.category])}`;
+  const ownerName =
+    subject.kind === 'listing' ? subject.listing.sellerName : subject.lostItem.reporterName;
+  const otherPartyName = item.isSeller
+    ? (item.conversation.buyerName ?? t('buyer'))
+    : (ownerName ?? t('seller'));
+  const nationId = subject.kind === 'listing' ? subject.listing.nationId : subject.lostItem.nationId;
+  const closed =
+    subject.kind === 'listing' ? !!subject.listing.isSold : subject.lostItem.status === 'resolved';
+  const closedLabel = subject.kind === 'listing' ? t('sold') : t('lostResolvedBadge');
   const previewText = item.lastMessage
-    ? `${item.listing.eventName} · ${item.lastMessage.text}`
-    : `${item.listing.eventName} · ${t('noChatYet')}`;
+    ? `${subjectLabel} · ${item.lastMessage.text}`
+    : `${subjectLabel} · ${t('noChatYet')}`;
 
   return (
     <Pressable
@@ -227,10 +266,10 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
         {
           backgroundColor: theme.backgroundElement,
           borderColor: isUnread ? '#C84646' : theme.backgroundSelected,
-          opacity: pressed ? 0.72 : item.listing.isSold ? 0.55 : 1,
+          opacity: pressed ? 0.72 : closed ? 0.55 : 1,
         },
       ]}>
-      <NationEmblem nationId={item.listing.nationId} />
+      <NationEmblem nationId={nationId} />
       <View style={styles.rowCopy}>
         <View style={styles.rowTitleLine}>
           <ThemedText numberOfLines={1} style={[styles.rowTitle, isUnread && styles.rowTitleUnread]}>
@@ -239,9 +278,9 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
           <View style={[styles.roleBadge, item.isSeller ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
             <ThemedText style={styles.roleBadgeText}>{item.isSeller ? t('seller') : t('buyer')}</ThemedText>
           </View>
-          {item.listing.isSold && (
+          {closed && (
             <View style={styles.soldBadge}>
-              <ThemedText style={styles.soldBadgeText}>{t('sold')}</ThemedText>
+              <ThemedText style={styles.soldBadgeText}>{closedLabel}</ThemedText>
             </View>
           )}
         </View>

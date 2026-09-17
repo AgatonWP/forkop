@@ -38,6 +38,15 @@ export default function AppTabs() {
         }}
       />
       <Tabs.Screen
+        name="lost"
+        options={{
+          title: t('lostTab'),
+          tabBarIcon: ({ color, focused, size }) => (
+            <Ionicons color={color} name={focused ? 'search' : 'search-outline'} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="sell"
         options={{
           title: t('sell'),
