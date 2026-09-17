@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Förköp",
+    "name": "F\u00f6rk\u00f6p",
     "slug": "forkop",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "forkop",
@@ -50,7 +50,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Appen behöver tillgång till dina bilder för att du ska kunna välja en profilbild.",
+          "photosPermission": "Appen beh\u00f6ver tillg\u00e5ng till dina bilder f\u00f6r att du ska kunna v\u00e4lja en profilbild.",
           "cameraPermission": false,
           "microphonePermission": false
         }
