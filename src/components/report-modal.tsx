@@ -23,20 +23,23 @@ import {
   ReportTargetType,
   submitReport,
 } from '@/lib/reports';
+import { LostItem } from '@/lib/lost-items';
 import { Listing } from '@/lib/tickets';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  listing: Listing | null;
+  /** Exactly one of these: a report points at a listing or at a lost item. */
+  listing?: Listing | null;
+  lostItem?: LostItem | null;
   /**
-   * 'listing' reports only the listing itself (no target-choice step).
-   * 'chat' lets the user pick between reporting the listing or the seller.
+   * 'listing' reports only the post itself (no target-choice step).
+   * 'chat' lets the user pick between reporting the post or the person.
    */
   mode: 'listing' | 'chat';
 };
 
-export function ReportModal({ visible, onClose, listing, mode }: Props) {
+export function ReportModal({ visible, onClose, listing, lostItem, mode }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -50,18 +53,18 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
 
   useEffect(() => {
     if (!visible) return;
-    setTargetType(mode === 'listing' ? 'listing' : null);
+    setTargetType(mode === 'listing' ? (lostItem ? 'lost_item' : 'listing') : null);
     setReason(null);
     setDetails('');
     setSubmitting(false);
     setError(null);
     setDone(false);
-  }, [visible, mode]);
+  }, [lostItem, mode, visible]);
 
-  if (!listing) return null;
+  if (!listing && !lostItem) return null;
 
   async function handleSubmit() {
-    if (!user || !listing || !targetType || !reason || submitting) return;
+    if (!user || !targetType || !reason || submitting) return;
 
     setSubmitting(true);
     setError(null);
@@ -69,7 +72,8 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
     try {
       await submitReport({
         reporterId: user.id,
-        listingId: listing.id,
+        listingId: lostItem ? undefined : listing?.id,
+        lostItemId: lostItem?.id,
         targetType,
         reason,
         details,
@@ -93,7 +97,9 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
       ? 'Vad vill du rapportera?'
       : targetType === 'profile'
         ? 'Rapportera användaren'
-        : 'Rapportera annonsen';
+        : lostItem
+          ? 'Rapportera anmälan'
+          : 'Rapportera annonsen';
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -124,9 +130,13 @@ export function ReportModal({ visible, onClose, listing, mode }: Props) {
             ) : showTargetStep ? (
               <View style={styles.optionList}>
                 <TargetOptionRow
-                  label="Annonsen"
-                  description="Fel information, olämpligt innehåll eller bluff i annonsen."
-                  onPress={() => setTargetType('listing')}
+                  label={lostItem ? 'Anmälan' : 'Annonsen'}
+                  description={
+                    lostItem
+                      ? 'Olämpligt innehåll eller falsk anmälan.'
+                      : 'Fel information, olämpligt innehåll eller bluff i annonsen.'
+                  }
+                  onPress={() => setTargetType(lostItem ? 'lost_item' : 'listing')}
                 />
                 <TargetOptionRow
                   label="Användaren"

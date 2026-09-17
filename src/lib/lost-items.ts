@@ -191,3 +191,10 @@ export async function deleteLostItem(itemId: string, userId: string): Promise<vo
 
   if (error) throw error;
 }
+
+/** Admin-only: relies on the "Admins can delete any lost item" RLS policy. */
+export async function adminDeleteLostItem(itemId: string): Promise<void> {
+  const { error } = await supabase.from('lost_items').delete().eq('id', itemId);
+
+  if (error) throw error;
+}

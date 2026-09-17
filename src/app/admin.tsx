@@ -8,6 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { checkIsAdmin } from '@/lib/admin';
+import { useI18n } from '@/lib/i18n';
+import { LOST_ITEM_CATEGORY_EMOJI, LOST_ITEM_CATEGORY_KEY, LostItemCategory, adminDeleteLostItem } from '@/lib/lost-items';
 import { SELECTABLE_NATIONS_LIST, getNation } from '@/lib/nations';
 import { AdminReport, dismissReport, fetchOpenReports } from '@/lib/reports';
 import { adminDeleteListing, fetchAllListingsAdmin, getListingOrganizerName, Listing } from '@/lib/tickets';
@@ -23,9 +25,23 @@ import {
 // "Annat" isn't a real organizer, and the database rejects verifying it.
 const VERIFIABLE_ORGANIZERS = SELECTABLE_NATIONS_LIST.filter(({ id }) => id !== 'other');
 
+function useLostItemSubject() {
+  const { t } = useI18n();
+
+  return (category: string | null) => {
+    if (!category) return '(borttagen anmälan)';
+
+    const known = category as LostItemCategory;
+    const label = LOST_ITEM_CATEGORY_KEY[known];
+
+    return label ? `${LOST_ITEM_CATEGORY_EMOJI[known]} ${t(label)}` : category;
+  };
+}
+
 export default function AdminScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
+  const describeLostItemSubject = useLostItemSubject();
   const { refresh: refreshVerifiedOrganizers } = useVerifiedOrganizers();
 
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -138,6 +154,27 @@ export default function AdminScreen() {
             setReports((prev) => prev.filter((report) => report.listingId !== listingId));
           } catch {
             Alert.alert('Fel', 'Kunde inte ta bort annonsen.');
+          } finally {
+            setBusyId(null);
+          }
+        },
+      },
+    ]);
+  }
+
+  function handleDeleteLostItem(lostItemId: string) {
+    Alert.alert('Ta bort anmälan', 'Anmälan och dess chattar tas bort permanent. Detta går inte att ångra.', [
+      { text: 'Avbryt', style: 'cancel' },
+      {
+        text: 'Ta bort',
+        style: 'destructive',
+        onPress: async () => {
+          setBusyId(lostItemId);
+          try {
+            await adminDeleteLostItem(lostItemId);
+            setReports((prev) => prev.filter((report) => report.lostItemId !== lostItemId));
+          } catch {
+            Alert.alert('Fel', 'Kunde inte ta bort anmälan.');
           } finally {
             setBusyId(null);
           }
@@ -278,11 +315,13 @@ export default function AdminScreen() {
                         key={report.id}
                         style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
                         <ThemedText style={styles.cardTitle}>
-                          {report.listingEventName ?? '(borttagen annons)'}
+                          {report.lostItemId
+                            ? `Hittegods: ${describeLostItemSubject(report.subjectName)}`
+                            : (report.subjectName ?? '(borttagen annons)')}
                         </ThemedText>
-                        {report.listingNationId && (
+                        {report.subjectNationId && (
                           <ThemedText type="small" themeColor="textSecondary">
-                            {getNation(report.listingNationId).name}
+                            {getNation(report.subjectNationId).name}
                           </ThemedText>
                         )}
                         <ThemedText type="small">Anledning: {report.reason}</ThemedText>
@@ -292,12 +331,22 @@ export default function AdminScreen() {
                           </ThemedText>
                         )}
                         <View style={styles.rowButtons}>
-                          <Pressable
-                            disabled={busyId === report.listingId}
-                            onPress={() => handleDeleteListing(report.listingId)}
-                            style={[styles.destructiveButton, busyId === report.listingId && styles.buttonDisabled]}>
-                            <ThemedText style={styles.destructiveButtonText}>Ta bort annons</ThemedText>
-                          </Pressable>
+                          {report.listingId && (
+                            <Pressable
+                              disabled={busyId === report.listingId}
+                              onPress={() => handleDeleteListing(report.listingId!)}
+                              style={[styles.destructiveButton, busyId === report.listingId && styles.buttonDisabled]}>
+                              <ThemedText style={styles.destructiveButtonText}>Ta bort annons</ThemedText>
+                            </Pressable>
+                          )}
+                          {report.lostItemId && (
+                            <Pressable
+                              disabled={busyId === report.lostItemId}
+                              onPress={() => handleDeleteLostItem(report.lostItemId!)}
+                              style={[styles.destructiveButton, busyId === report.lostItemId && styles.buttonDisabled]}>
+                              <ThemedText style={styles.destructiveButtonText}>Ta bort anmälan</ThemedText>
+                            </Pressable>
+                          )}
                           <Pressable
                             disabled={busyId === report.id}
                             onPress={() => handleDismissReport(report.id)}

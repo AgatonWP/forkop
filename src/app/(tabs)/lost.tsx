@@ -14,6 +14,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { LostItemChatModal } from '@/components/lost-item-chat-modal';
 import { LostItemForm } from '@/components/lost-item-form';
+import { ReportModal } from '@/components/report-modal';
 import { NationEmblem } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,6 +22,7 @@ import { Toast } from '@/components/toast';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { blockUser } from '@/lib/blocking';
 import { useI18n } from '@/lib/i18n';
 import {
   LOST_ITEM_CATEGORY_EMOJI,
@@ -48,6 +50,7 @@ export default function LostScreen() {
   const [formOpen, setFormOpen] = useState(false);
   const [chatItem, setChatItem] = useState<LostItem | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [reportItem, setReportItem] = useState<LostItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(
@@ -144,6 +147,37 @@ export default function LostScreen() {
     ]);
   }
 
+  // Reporting has to be reachable without starting a chat: an offensive post is
+  // exactly the one nobody wants to message.
+  function handleSafetyActions(item: LostItem) {
+    if (!user) return;
+
+    Alert.alert(t('safetyActions'), undefined, [
+      { text: t('reportListing'), onPress: () => setReportItem(item) },
+      {
+        text: t('blockUser'),
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
+            { text: t('cancel'), style: 'cancel' },
+            {
+              text: t('blockUser'),
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await blockUser(user.id, item.userId);
+                  setItems((current) => current.filter((existing) => existing.userId !== item.userId));
+                } catch {
+                  setToast(t('blockUserError'));
+                }
+              },
+            },
+          ]),
+      },
+      { text: t('cancel'), style: 'cancel' },
+    ]);
+  }
+
   return (
     <ThemedView style={styles.screen}>
       <Toast message={toast} onHidden={() => setToast(null)} topOffset={insets.top + Spacing.six} />
@@ -217,6 +251,7 @@ export default function LostScreen() {
               pending={pendingId === item.id}
               language={language}
               onContact={() => setChatItem(item)}
+              onSafetyActions={() => handleSafetyActions(item)}
               onResolve={() => handleResolve(item)}
               onDelete={() => handleDelete(item)}
             />
@@ -255,6 +290,13 @@ export default function LostScreen() {
       />
 
       <LostItemChatModal item={chatItem} onClose={() => setChatItem(null)} />
+
+      <ReportModal
+        visible={!!reportItem}
+        lostItem={reportItem}
+        mode="listing"
+        onClose={() => setReportItem(null)}
+      />
     </ThemedView>
   );
 }
@@ -265,6 +307,7 @@ function LostItemCard({
   pending,
   language,
   onContact,
+  onSafetyActions,
   onResolve,
   onDelete,
 }: {
@@ -273,6 +316,7 @@ function LostItemCard({
   pending: boolean;
   language: 'sv' | 'en';
   onContact: () => void;
+  onSafetyActions: () => void;
   onResolve: () => void;
   onDelete: () => void;
 }) {
@@ -326,11 +370,20 @@ function LostItemCard({
             </Pressable>
           </View>
         ) : (
-          <Pressable onPress={onContact} style={[styles.actionButton, styles.actionButtonPrimary]}>
-            <ThemedText type="small" style={styles.actionButtonText}>
-              {t(item.kind === 'found' ? 'lostActionItsMine' : 'lostActionHaveIt')}
-            </ThemedText>
-          </Pressable>
+          <View style={styles.cardActions}>
+            <Pressable
+              accessibilityLabel={t('safetyActions')}
+              hitSlop={8}
+              onPress={onSafetyActions}
+              style={styles.ghostButton}>
+              <Ionicons color={theme.textSecondary} name="ellipsis-horizontal" size={18} />
+            </Pressable>
+            <Pressable onPress={onContact} style={[styles.actionButton, styles.actionButtonPrimary]}>
+              <ThemedText type="small" style={styles.actionButtonText}>
+                {t(item.kind === 'found' ? 'lostActionItsMine' : 'lostActionHaveIt')}
+              </ThemedText>
+            </Pressable>
+          </View>
         )}
       </View>
     </View>

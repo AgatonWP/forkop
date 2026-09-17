@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ReportModal } from '@/components/report-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -72,6 +73,7 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const promptedFor = useRef<string | null>(null);
 
   const isOwnPost = !!user && !!item && item.userId === user.id;
@@ -170,23 +172,32 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
     }
   }, [conversation, draft, sending, t, user]);
 
-  function handleBlock() {
+  function handleSafetyActions() {
     if (!item || !user || isOwnPost) return;
 
-    Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
-      { text: t('cancel'), style: 'cancel' },
+    Alert.alert(t('safetyActions'), undefined, [
+      { text: t('reportUser'), onPress: () => setReportOpen(true) },
       {
         text: t('blockUser'),
         style: 'destructive',
-        onPress: async () => {
-          try {
-            await blockUser(user.id, item.userId);
-            setBlocked(true);
-          } catch {
-            setSendError(t('blockUserError'));
-          }
-        },
+        onPress: () =>
+          Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
+            { text: t('cancel'), style: 'cancel' },
+            {
+              text: t('blockUser'),
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await blockUser(user.id, item.userId);
+                  setBlocked(true);
+                } catch {
+                  setSendError(t('blockUserError'));
+                }
+              },
+            },
+          ]),
       },
+      { text: t('cancel'), style: 'cancel' },
     ]);
   }
 
@@ -218,7 +229,11 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
           </View>
 
           {!isOwnPost && (
-            <Pressable accessibilityLabel={t('blockUser')} hitSlop={12} onPress={handleBlock} style={styles.headerButton}>
+            <Pressable
+              accessibilityLabel={t('safetyActions')}
+              hitSlop={12}
+              onPress={handleSafetyActions}
+              style={styles.headerButton}>
               <Ionicons color={theme.textSecondary} name="ellipsis-horizontal" size={20} />
             </Pressable>
           )}
@@ -317,6 +332,13 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
             </View>
           )}
         </KeyboardAvoidingView>
+
+        <ReportModal
+          visible={reportOpen}
+          lostItem={item}
+          mode="chat"
+          onClose={() => setReportOpen(false)}
+        />
       </ThemedView>
     </Modal>
   );
