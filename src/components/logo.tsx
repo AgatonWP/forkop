@@ -4,12 +4,15 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
 const FONT_SIZE = 20;
-// Kept as ratios so the dots hold their proportions at any logo size.
-const DOT_SIZE = FONT_SIZE * 0.125;
-const DOT_GAP = FONT_SIZE * 0.13;
-// Sitting on the bottom of the text box puts the dots in the descender
-// space, which is the whole gap there is between them and the baseline.
-const DOT_DROP = 0;
+// Measured off Poppins' own diaeresis — the dots over the first Ö — so the
+// pair under the second one reads as the same mark turned upside down rather
+// than as two stray dots. Ratios, so they hold at any logo size.
+const DOT_SIZE = FONT_SIZE * 0.15;
+const DOT_GAP = FONT_SIZE * 0.05;
+// Poppins leaves a deep descender below the baseline. Left at the bottom of
+// the text box the dots drifted five times further from the letter than the
+// ones above it, so they are lifted back up into place.
+const DOT_DROP = FONT_SIZE * 0.21;
 
 export function Logo() {
   const theme = useTheme();
