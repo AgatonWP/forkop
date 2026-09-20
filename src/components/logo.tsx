@@ -9,10 +9,11 @@ const FONT_SIZE = 20;
 // than as two stray dots. Ratios, so they hold at any logo size.
 const DOT_SIZE = FONT_SIZE * 0.15;
 const DOT_GAP = FONT_SIZE * 0.05;
-// Poppins leaves a deep descender below the baseline. Left at the bottom of
-// the text box the dots drifted five times further from the letter than the
-// ones above it, so they are lifted back up into place.
-const DOT_DROP = FONT_SIZE * 0.21;
+// Poppins leaves a deep descender below the baseline, so the dots need lifting
+// off the bottom of the text box. Not all the way to the 1 px the font puts
+// above the first Ö: dots below a round letter read tighter than dots above
+// one, and at that spacing they looked stuck to it on a phone.
+const DOT_DROP = FONT_SIZE * 0.12;
 
 export function Logo() {
   const theme = useTheme();

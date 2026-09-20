@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AddButton } from '@/components/add-button';
 import { LostItemChatModal } from '@/components/lost-item-chat-modal';
 import { LostItemForm } from '@/components/lost-item-form';
 import { ReportModal } from '@/components/report-modal';
@@ -191,12 +192,7 @@ export default function LostScreen() {
         <View style={styles.headerInner}>
           <ThemedText style={styles.headerTitle}>{t('lostTitle')}</ThemedText>
           {user && (
-            <Pressable
-              accessibilityLabel={t('lostNewTitle')}
-              onPress={() => setFormOpen(true)}
-              style={({ pressed }) => [styles.addButton, { opacity: pressed ? 0.7 : 1 }]}>
-              <ThemedText style={styles.addButtonText}>+</ThemedText>
-            </Pressable>
+            <AddButton accessibilityLabel={t('lostNewTitle')} onPress={() => setFormOpen(true)} />
           )}
         </View>
       </SafeAreaView>
@@ -408,20 +404,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
-  },
-  addButton: {
-    alignItems: 'center',
-    backgroundColor: '#1D2430',
-    borderRadius: 16,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 24,
   },
   listContent: {
     alignSelf: 'center',

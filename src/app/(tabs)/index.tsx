@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 
+import { AddButton } from '@/components/add-button';
 import { ChatModal } from '@/components/chat-modal';
 import { Logo } from '@/components/logo';
 import { getNationImage } from '@/components/nation-emblem';
@@ -389,15 +390,7 @@ export default function HomeScreen() {
               <Logo />
             </View>
             <View style={[styles.headerSide, styles.headerSideRight]}>
-              <Pressable
-                accessibilityLabel={t('sell')}
-                style={({ pressed }) => [
-                  styles.createButton,
-                  pressed && styles.createButtonPressed,
-                ]}
-                onPress={() => router.push('/sell')}>
-                <ThemedText style={styles.createButtonText}>+</ThemedText>
-              </Pressable>
+              <AddButton accessibilityLabel={t('sell')} onPress={() => router.push('/sell')} />
             </View>
           </View>
         </View>
@@ -1217,28 +1210,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 36,
     justifyContent: 'center',
-  },
-  createButton: {
-    alignItems: 'center',
-    backgroundColor: '#1D2430',
-    borderRadius: 18,
-    height: 36,
-    justifyContent: 'center',
-    shadowColor: '#1D2430',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    width: 36,
-  },
-  createButtonPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.98 }],
-  },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '600',
-    lineHeight: 24,
   },
   listContent: {
     alignSelf: 'center',
