@@ -24,7 +24,9 @@ export default function AppTabs() {
           borderTopColor: colors.backgroundSelected,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          // Five tabs leave about 75 px each on a 375 px screen, and
+          // "Meddelanden" did not fit at 12.
+          fontSize: 10,
           fontWeight: '700',
         },
       }}>
