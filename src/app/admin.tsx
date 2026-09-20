@@ -316,7 +316,7 @@ export default function AdminScreen() {
                         style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
                         <ThemedText style={styles.cardTitle}>
                           {report.lostItemId
-                            ? `Hittegods: ${describeLostItemSubject(report.subjectName)}`
+                            ? `Borttappat: ${describeLostItemSubject(report.subjectName)}`
                             : (report.subjectName ?? '(borttagen annons)')}
                         </ThemedText>
                         {report.subjectNationId && (
