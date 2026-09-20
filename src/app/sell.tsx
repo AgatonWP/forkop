@@ -241,7 +241,7 @@ export default function SellScreen() {
               }}
               onGoHome={() => {
                 setSubmitted(false);
-                router.push('/');
+                router.back();
               }}
             />
           </ScrollView>
@@ -256,7 +256,12 @@ export default function SellScreen() {
         edges={['top']}
         style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
+          {/* Presented as a modal rather than a tab, so it needs its own way out. */}
+          <Pressable hitSlop={12} onPress={() => router.back()} style={styles.headerCancel}>
+            <ThemedText style={styles.headerCancelText}>{t('cancel')}</ThemedText>
+          </Pressable>
           <ThemedText style={styles.headerTitle}>{t('postListing')}</ThemedText>
+          <View style={styles.headerCancel} />
         </View>
       </SafeAreaView>
 
@@ -993,9 +998,18 @@ const styles = StyleSheet.create({
   headerInner: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     minHeight: SecondaryHeaderHeight,
     paddingHorizontal: Spacing.three,
+  },
+  headerCancel: {
+    justifyContent: 'center',
+    minWidth: 64,
+  },
+  headerCancelText: {
+    color: '#4F6FB7',
+    fontSize: 16,
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 17,

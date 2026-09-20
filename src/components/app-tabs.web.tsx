@@ -28,14 +28,11 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>{t('buy')}</TabButton>
           </TabTrigger>
-          <TabTrigger name="lost" href="/lost" asChild>
-            <TabButton>{t('lostTab')}</TabButton>
-          </TabTrigger>
-          <TabTrigger name="sell" href="/sell" asChild>
-            <SellTabButton>+ {t('sell')}</SellTabButton>
-          </TabTrigger>
           <TabTrigger name="messages" href="/messages" asChild>
             <TabButton unreadCount={unreadConversationCount}>{t('messages')}</TabButton>
+          </TabTrigger>
+          <TabTrigger name="lost" href="/lost" asChild>
+            <TabButton>{t('lostTab')}</TabButton>
           </TabTrigger>
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>{t('profile')}</TabButton>
@@ -66,18 +63,6 @@ export function TabButton({
           </View>
         )}
       </ThemedView>
-    </Pressable>
-  );
-}
-
-export function SellTabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
-  return (
-    <Pressable {...props} style={({ pressed }) => [pressed && styles.pressed]}>
-      <View style={[styles.sellButtonView, isFocused && styles.sellButtonViewActive]}>
-        <ThemedText style={[styles.sellButtonText, isFocused && styles.sellButtonTextActive]}>
-          {children}
-        </ThemedText>
-      </View>
     </Pressable>
   );
 }
@@ -144,23 +129,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     lineHeight: 12,
-  },
-  sellButtonView: {
-    backgroundColor: '#1D2430',
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.one + 2,
-    paddingHorizontal: Spacing.three,
-  },
-  sellButtonViewActive: {
-    backgroundColor: '#E39E72',
-  },
-  sellButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  sellButtonTextActive: {
-    color: '#FFFFFF',
   },
 });

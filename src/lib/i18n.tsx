@@ -4,7 +4,7 @@ export type Language = 'sv' | 'en';
 
 const translations = {
   sv: {
-    buy: 'Köp',
+    buy: 'Hitta',
     sell: 'Lägg upp',
     messages: 'Meddelanden',
     profile: 'Profil',
@@ -303,7 +303,7 @@ const translations = {
     watchDeleteError: 'Kunde inte ta bort bevakningen.',
   },
   en: {
-    buy: 'Buy',
+    buy: 'Find',
     sell: 'Post',
     messages: 'Messages',
     profile: 'Profile',
