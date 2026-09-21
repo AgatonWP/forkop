@@ -34,9 +34,18 @@ export function describeListingError(error: unknown, t: (key: TranslationKey) =>
 
 export type DealType = 'sell' | 'trade' | 'both';
 
+/**
+ * Which way a listing points. An offer has tickets to give; a wanted post is
+ * someone looking for them. deal_type keeps its three values for both: on a
+ * wanted post 'sell' reads as "pays money" and trade_description as what the
+ * poster can give in exchange.
+ */
+export type ListingDirection = 'offer' | 'wanted';
+
 export type Listing = {
   id: string;
   userId: string;
+  direction: ListingDirection;
   eventName: string;
   ticketType: string;
   eventDate?: string;
@@ -85,6 +94,23 @@ export function getListingOrganizerName(listing: Listing) {
   return separatorIndex === -1 ? listing.eventName : listing.eventName.slice(0, separatorIndex);
 }
 
+/**
+ * Who is actually buying and selling in a conversation about a listing.
+ * conversations.seller_id is always the listing's owner and buyer_id the person
+ * who got in touch — names from before wanted posts existed, kept because
+ * renaming the columns would break every app version already installed. On a
+ * wanted post the owner is the buyer, so the two swap. Anything that cares who
+ * pays — Swish, role badges, ratings — should ask here rather than compare ids.
+ */
+export function conversationRoles(
+  listing: Pick<Listing, 'direction'>,
+  conversation: { buyerId: string; sellerId: string },
+): { buyerId: string; sellerId: string } {
+  return listing.direction === 'wanted'
+    ? { buyerId: conversation.sellerId, sellerId: conversation.buyerId }
+    : { buyerId: conversation.buyerId, sellerId: conversation.sellerId };
+}
+
 export function formatTicketQuantity(quantity: number) {
   return quantity >= MORE_THAN_MAX_TICKET_QUANTITY
     ? `${MAX_EXACT_TICKET_QUANTITY}+`
@@ -94,6 +120,7 @@ export function formatTicketQuantity(quantity: number) {
 type ListingRow = {
   id: string;
   user_id: string;
+  direction: ListingDirection | null;
   event_name: string;
   ticket_type: string;
   event_date: string | null;
@@ -111,7 +138,33 @@ type ListingRow = {
 };
 
 const LISTING_COLUMNS =
-  'id,user_id,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,created_at,updated_at,nation_id,status,seller_name,seller_avatar_url';
+  'id,user_id,direction,event_name,ticket_type,event_date,quantity,deal_type,price,trade_description,description,created_at,updated_at,nation_id,status,seller_name,seller_avatar_url';
+
+// The same list from before wanted posts existed. Kept so that an app built
+// with them still shows every offer against a database where
+// 20260921090000_wanted_listings.sql has not been run yet — otherwise
+// releasing the app first would empty the feed for everyone who updates.
+const LEGACY_LISTING_COLUMNS = LISTING_COLUMNS.replace('direction,', '');
+
+type ListingQueryResult = PromiseLike<{
+  data: unknown[] | null;
+  error: { code?: string; message: string } | null;
+}>;
+
+async function selectListings(query: (columns: string) => ListingQueryResult): Promise<Listing[]> {
+  let { data, error } = await query(LISTING_COLUMNS);
+
+  // 42703: undefined column — the database predates wanted posts.
+  if (error?.code === '42703') {
+    ({ data, error } = await query(LEGACY_LISTING_COLUMNS));
+  }
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => mapListing(row as ListingRow));
+}
 
 export function parseListingEventDate(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number);
@@ -152,6 +205,7 @@ function mapListing(row: ListingRow): Listing {
   return {
     id: row.id,
     userId: row.user_id,
+    direction: row.direction ?? 'offer',
     eventName: row.event_name,
     ticketType: row.ticket_type,
     eventDate: row.event_date ?? undefined,
@@ -170,46 +224,29 @@ function mapListing(row: ListingRow): Listing {
 }
 
 export async function fetchActiveListings(): Promise<Listing[]> {
-  const { data, error } = await supabase
-    .from('listings')
-    .select(LISTING_COLUMNS)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data ?? []).map((row) => mapListing(row as ListingRow));
+  return selectListings((columns) =>
+    supabase
+      .from('listings')
+      .select(columns)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false }),
+  );
 }
 
 export async function fetchMyListings(userId: string): Promise<Listing[]> {
-  const { data, error } = await supabase
-    .from('listings')
-    .select(LISTING_COLUMNS)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data ?? []).map((row) => mapListing(row as ListingRow));
+  return selectListings((columns) =>
+    supabase
+      .from('listings')
+      .select(columns)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+  );
 }
 
 export async function fetchListingsByIds(listingIds: string[]): Promise<Listing[]> {
   if (listingIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from('listings')
-    .select(LISTING_COLUMNS)
-    .in('id', listingIds);
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data ?? []).map((row) => mapListing(row as ListingRow));
+  return selectListings((columns) => supabase.from('listings').select(columns).in('id', listingIds));
 }
 
 export const SOLD_LISTING_KEEP_MS = 24 * 60 * 60 * 1000;
@@ -246,16 +283,9 @@ export async function deleteListing(listingId: string, userId: string): Promise<
 
 /** Admin-only: relies on the "Admins can view/delete any listing" RLS policies. */
 export async function fetchAllListingsAdmin(): Promise<Listing[]> {
-  const { data, error } = await supabase
-    .from('listings')
-    .select(LISTING_COLUMNS)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return (data ?? []).map((row) => mapListing(row as ListingRow));
+  return selectListings((columns) =>
+    supabase.from('listings').select(columns).order('created_at', { ascending: false }),
+  );
 }
 
 export async function adminDeleteListing(listingId: string): Promise<void> {

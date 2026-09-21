@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   Animated,
   Easing,
@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { SELECTABLE_NATIONS_LIST, getNation } from '@/lib/nations';
 import {
   DealType,
+  ListingDirection,
   MORE_THAN_MAX_TICKET_QUANTITY,
   describeListingError,
   formatListingEventDate,
@@ -52,6 +53,14 @@ export default function SellScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { language, t } = useI18n();
+  // The + opens this as "Jag säljer", which is what it has always done. "Jag
+  // söker" is preselected only when the feed sends someone here after finding
+  // nothing — the moment a wanted post is what they actually need.
+  const params = useLocalSearchParams<{ direction?: string }>();
+  const [direction, setDirection] = useState<ListingDirection>(
+    params.direction === 'wanted' ? 'wanted' : 'offer',
+  );
+  const wanted = direction === 'wanted';
 
   const [nationId, setNationId] = useState('');
   const [customOrganizer, setCustomOrganizer] = useState('');
@@ -202,6 +211,10 @@ export default function SellScreen() {
 
     const { error } = await supabase.from('listings').insert({
       user_id: user.id,
+      // Left out for offers: the column defaults to 'offer', and omitting it
+      // keeps posting working against a database the wanted-posts migration
+      // has not reached yet.
+      ...(direction === 'wanted' ? { direction } : {}),
       event_name: eventDisplayName.trim(),
       ticket_type: effectiveTicketType,
       event_date: eventDate,
@@ -287,6 +300,11 @@ export default function SellScreen() {
                   </Pressable>
                 </View>
               )}
+
+              <View style={[styles.segment, { backgroundColor: theme.backgroundSelected }]}>
+                <SegmentButton label={t('iSell')} active={!wanted} onPress={() => setDirection('offer')} />
+                <SegmentButton label={t('iSeek')} active={wanted} onPress={() => setDirection('wanted')} />
+              </View>
 
               {/* 1. Nation / arrangör */}
               <FormSection label={t('nationOrganizer')}>
@@ -403,7 +421,7 @@ export default function SellScreen() {
               <FormSection label={t('iWantTo')}>
                 <View style={[styles.segment, { backgroundColor: theme.backgroundSelected }]}>
                   <SegmentButton
-                    label={t('sellAction')}
+                    label={wanted ? t('buyAction') : t('sellAction')}
                     active={dealType === 'sell'}
                     onPress={() => setDealType('sell')}
                   />
@@ -413,7 +431,7 @@ export default function SellScreen() {
                     onPress={() => setDealType('trade')}
                   />
                   <SegmentButton
-                    label={t('sellOrTrade')}
+                    label={wanted ? t('buyOrTrade') : t('sellOrTrade')}
                     active={dealType === 'both'}
                     onPress={() => setDealType('both')}
                   />
@@ -447,7 +465,9 @@ export default function SellScreen() {
 
                   {(dealType === 'trade' || dealType === 'both') && (
                     <View style={styles.followUpSection}>
-                      <ThemedText style={styles.formLabel}>{t('againstLabel')}</ThemedText>
+                      <ThemedText style={styles.formLabel}>
+                        {wanted ? t('canOfferLabel') : t('againstLabel')}
+                      </ThemedText>
                       <View style={styles.tradeTargetBox}>
                         <View style={styles.inlineFields}>
                           <View style={styles.ticketTypeField}>

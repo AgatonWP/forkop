@@ -36,7 +36,13 @@ import {
   subscribeToMessages,
 } from '@/lib/messages';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
-import { Listing, formatListingEventDate, formatTicketQuantity, markListingSold } from '@/lib/tickets';
+import {
+  Listing,
+  conversationRoles,
+  formatListingEventDate,
+  formatTicketQuantity,
+  markListingSold,
+} from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 import { ReportModal } from '@/components/report-modal';
@@ -65,6 +71,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
   const { language, t } = useI18n();
   const { markConversationRead } = useUnreadMessages();
   const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
+  const listingDirection = listing?.direction ?? 'offer';
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,12 +182,13 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
 
     let active = true;
     const otherUserId = conversation.sellerId === user.id ? conversation.buyerId : conversation.sellerId;
+    // Swish belongs to the buyer and shows the seller's number. On an offer
+    // that is the person who got in touch; on a wanted post, the owner.
+    const roles = conversationRoles({ direction: listingDirection }, conversation);
 
     Promise.all([
       getBlockStatus(otherUserId),
-      conversation.sellerId === user.id
-        ? Promise.resolve(null)
-        : fetchSellerSwishNumber(conversation.sellerId),
+      roles.buyerId === user.id ? fetchSellerSwishNumber(roles.sellerId) : Promise.resolve(null),
     ])
       .then(([blockStatus, swishNumber]) => {
         if (!active) return;
@@ -196,7 +204,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
     return () => {
       active = false;
     };
-  }, [conversation, user]);
+  }, [conversation, listingDirection, user]);
 
   useEffect(() => {
     if (!conversation || !user) return;
@@ -310,7 +318,10 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
     const options: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [];
 
     if (canMarkSold) {
-      options.push({ text: t('markAsSold'), onPress: handleMarkSold });
+      options.push({
+        text: listing?.direction === 'wanted' ? t('markAsBought') : t('markAsSold'),
+        onPress: handleMarkSold,
+      });
     }
 
     options.push({ text: t('reportUser'), onPress: () => setReportOpen(true) });
@@ -391,10 +402,12 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
 
   if (!listing) return null;
 
-  const isSeller = !!user && listing.userId === user.id;
-  const showVerifiedBadge = !isSeller && isVerifiedOrganizerListing(listing);
-  const otherPartyName = isSeller ? (conversation?.buyerName ?? t('buyer')) : (listing.sellerName ?? t('seller'));
-  const otherPartyAvatarUrl = isSeller ? conversation?.buyerAvatarUrl : listing.sellerAvatarUrl;
+  const isOwner = !!user && listing.userId === user.id;
+  // Mirrors conversationRoles() without needing the conversation to have loaded.
+  const iAmBuyer = listing.direction === 'wanted' ? isOwner : !isOwner;
+  const showVerifiedBadge = !isOwner && isVerifiedOrganizerListing(listing);
+  const otherPartyName = isOwner ? (conversation?.buyerName ?? t('buyer')) : (listing.sellerName ?? t('seller'));
+  const otherPartyAvatarUrl = isOwner ? conversation?.buyerAvatarUrl : listing.sellerAvatarUrl;
   const listingMeta = [
     listing.eventName,
     listing.eventDate ? formatListingEventDate(listing.eventDate, language) : null,
@@ -449,7 +462,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1} style={styles.headerMetaText}>
                 {listingMeta}
               </ThemedText>
-              {!isSeller && ratingSummary && (
+              {!isOwner && ratingSummary && (
                 <View style={styles.sellerRatingBadge}>
                   <ThemedText
                     style={[
@@ -475,7 +488,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold }: P
           </View>
         </View>
 
-        {!isSeller && sellerSwishNumber && !interactionBlocked && (
+        {iAmBuyer && sellerSwishNumber && !interactionBlocked && (
           <View style={[styles.swishBar, { backgroundColor: theme.backgroundElement, borderBottomColor: theme.backgroundSelected }]}>
             <Pressable
               onPress={handleCopySwishNumber}

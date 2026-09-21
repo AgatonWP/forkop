@@ -30,7 +30,19 @@ const authStorage =
       ? webStorage
       : AsyncStorage;
 
+/**
+ * Sent with every request as x-forkop-api, and read by the database through
+ * public.client_api_version(). Rows an older app would misread are gated on it
+ * — wanted posts need 2, see 20260921090000_wanted_listings.sql — so bump it
+ * whenever the schema learns something the version already on people's phones
+ * does not know about, and gate the new rows on the new number.
+ */
+export const CLIENT_API_VERSION = 2;
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: { 'x-forkop-api': String(CLIENT_API_VERSION) },
+  },
   auth: {
     storage: authStorage,
     autoRefreshToken: true,

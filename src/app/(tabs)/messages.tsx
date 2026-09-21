@@ -24,7 +24,7 @@ import {
   LostItem,
   fetchLostItemsByIds,
 } from '@/lib/lost-items';
-import { Listing, fetchListingsByIds, formatRelativeTime } from '@/lib/tickets';
+import { Listing, conversationRoles, fetchListingsByIds, formatRelativeTime } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 
 /** A conversation is about a ticket listing or about a lost item, never both. */
@@ -36,7 +36,8 @@ type InboxItem = {
   conversation: Conversation;
   subject: InboxSubject;
   lastMessage: Message | null;
-  isSeller: boolean;
+  /** Owns the post the conversation is about — not the same as being the seller. */
+  isOwner: boolean;
 };
 
 export default function MessagesScreen() {
@@ -87,7 +88,7 @@ export default function MessagesScreen() {
             conversation,
             subject,
             lastMessage: latestByConversation.get(conversation.id) ?? null,
-            isSeller: conversation.sellerId === user.id,
+            isOwner: conversation.sellerId === user.id,
           };
         })
         .filter((item): item is InboxItem => item !== null && item.lastMessage !== null)
@@ -239,6 +240,7 @@ export default function MessagesScreen() {
 function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: boolean; onPress: () => void }) {
   const theme = useTheme();
   const { t } = useI18n();
+  const { user } = useAuth();
   const subject = item.subject;
   const subjectLabel =
     subject.kind === 'listing'
@@ -246,9 +248,18 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
       : `${LOST_ITEM_CATEGORY_EMOJI[subject.lostItem.category]} ${t(LOST_ITEM_CATEGORY_KEY[subject.lostItem.category])}`;
   const ownerName =
     subject.kind === 'listing' ? subject.listing.sellerName : subject.lostItem.reporterName;
-  const otherPartyName = item.isSeller
+  const otherPartyName = item.isOwner
     ? (item.conversation.buyerName ?? t('buyer'))
     : (ownerName ?? t('seller'));
+  // Buying and selling only mean something for tickets. On a wanted post the
+  // owner is the buyer, so the role comes from conversationRoles(), not from
+  // who owns the post.
+  const role =
+    subject.kind === 'listing' && user
+      ? conversationRoles(subject.listing, item.conversation).sellerId === user.id
+        ? 'seller'
+        : 'buyer'
+      : null;
   const nationId = subject.kind === 'listing' ? subject.listing.nationId : subject.lostItem.nationId;
   const closed =
     subject.kind === 'listing' ? !!subject.listing.isSold : subject.lostItem.status === 'resolved';
@@ -275,9 +286,11 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
           <ThemedText numberOfLines={1} style={[styles.rowTitle, isUnread && styles.rowTitleUnread]}>
             {otherPartyName}
           </ThemedText>
-          <View style={[styles.roleBadge, item.isSeller ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
-            <ThemedText style={styles.roleBadgeText}>{item.isSeller ? t('seller') : t('buyer')}</ThemedText>
-          </View>
+          {role && (
+            <View style={[styles.roleBadge, role === 'seller' ? styles.roleBadgeSeller : styles.roleBadgeBuyer]}>
+              <ThemedText style={styles.roleBadgeText}>{role === 'seller' ? t('seller') : t('buyer')}</ThemedText>
+            </View>
+          )}
           {closed && (
             <View style={styles.soldBadge}>
               <ThemedText style={styles.soldBadgeText}>{closedLabel}</ThemedText>

@@ -105,14 +105,16 @@ export function RatingModal({ listing, onClose, onSubmitted }: Props) {
     <Modal visible={!!listing} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-          <ThemedText style={styles.title}>{t('rateBuyerTitle')}</ThemedText>
+          <ThemedText style={styles.title}>
+            {listing?.direction === 'wanted' ? t('rateSellerTitle') : t('rateBuyerTitle')}
+          </ThemedText>
 
           {loading && <ActivityIndicator size="small" color={theme.textSecondary} />}
 
           {showEmpty && (
             <>
               <ThemedText type="small" themeColor="textSecondary">
-                {t('rateBuyerNoChats')}
+                {listing?.direction === 'wanted' ? t('rateSellerNoChats') : t('rateBuyerNoChats')}
               </ThemedText>
               <Pressable onPress={onClose} style={[styles.actionButton, styles.closeButton]}>
                 <ThemedText style={styles.actionButtonText}>{t('done')}</ThemedText>
@@ -123,7 +125,7 @@ export function RatingModal({ listing, onClose, onSubmitted }: Props) {
           {showPicker && (
             <>
               <ThemedText type="small" themeColor="textSecondary">
-                {t('rateBuyerPickChat')}
+                {listing?.direction === 'wanted' ? t('rateSellerPickChat') : t('rateBuyerPickChat')}
               </ThemedText>
               <View style={styles.chatList}>
                 {conversations.map((conversation) => {

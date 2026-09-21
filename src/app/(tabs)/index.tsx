@@ -87,6 +87,11 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { addWatch, removeWatch, findWatch } = useTicketWatches();
   const [watchSubmitting, setWatchSubmitting] = useState(false);
+  // "Köpa" shows what is for sale, exactly the feed that existed before wanted
+  // posts; "Sälja" shows people looking for tickets. Named after what the
+  // user wants to do rather than after the posts, so the default reads right.
+  const [side, setSide] = useState<'buy' | 'sell'>('buy');
+  const sideDirection = side === 'buy' ? 'offer' : 'wanted';
   const [search, setSearch] = useState('');
   const [nationFilter, setNationFilter] = useState<string | null>(null);
   const [nationPickerOpen, setNationPickerOpen] = useState(false);
@@ -173,10 +178,12 @@ export default function HomeScreen() {
   const listingDaySet = useMemo(() => {
     const uniqueDates = new Set<string>();
     listings.forEach((listing) => {
-      if (!listing.isSold && listing.eventDate) uniqueDates.add(listing.eventDate);
+      if (!listing.isSold && listing.eventDate && listing.direction === sideDirection) {
+        uniqueDates.add(listing.eventDate);
+      }
     });
     return uniqueDates;
-  }, [listings]);
+  }, [listings, sideDirection]);
 
   function toggleDayFilter(day: string) {
     setDayFilter((current) => {
@@ -190,9 +197,15 @@ export default function HomeScreen() {
     });
   }
 
+  // On a wanted post 'sell' means the poster pays money, so the label follows.
+  const dealFilterLabel = useCallback(
+    (id: 'sell' | 'trade') =>
+      id === 'trade' ? t('tradeListing') : side === 'sell' ? t('wantedDealBuy') : t('sellListing'),
+    [side, t],
+  );
   const dealFilterOptions = useMemo(
-    () => DEAL_FILTERS.map((item) => ({ id: item.id, label: t(item.translationKey) })),
-    [t],
+    () => DEAL_FILTERS.map((item) => ({ id: item.id, label: dealFilterLabel(item.id) })),
+    [dealFilterLabel],
   );
 
   const dayFilterButtonLabel = useMemo(() => {
@@ -208,7 +221,7 @@ export default function HomeScreen() {
     const query = search.trim().toLowerCase();
 
     return listings
-      .filter((listing) => !listing.isSold)
+      .filter((listing) => !listing.isSold && listing.direction === sideDirection)
       .filter((listing) => !nationFilter || listing.nationId === nationFilter)
       .filter((listing) => {
         if (!ticketTypeFilter) return true;
@@ -245,7 +258,7 @@ export default function HomeScreen() {
         const proximityDiff = Math.abs(aDiff) - Math.abs(bDiff);
         return proximityDiff !== 0 ? proximityDiff : aDiff - bDiff;
       });
-  }, [nationFilter, ticketTypeFilter, dealFilter, dayFilter, listings, search]);
+  }, [nationFilter, ticketTypeFilter, dealFilter, dayFilter, listings, search, sideDirection]);
 
   // The free-text search is left out on purpose: it matches loosely on event
   // names and nation aliases, which would make it impossible to tell what a
@@ -416,6 +429,28 @@ export default function HomeScreen() {
           ]}
           ListHeaderComponent={
             <View style={styles.filters}>
+              <View style={[styles.sideSegment, { backgroundColor: theme.backgroundSelected }]}>
+                {(['buy', 'sell'] as const).map((option) => {
+                  const active = side === option;
+
+                  return (
+                    <Pressable
+                      key={option}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => setSide(option)}
+                      style={[styles.sideSegmentItem, active && { backgroundColor: theme.backgroundElement }]}>
+                      <ThemedText
+                        type="small"
+                        themeColor={active ? 'text' : 'textSecondary'}
+                        style={styles.sideSegmentLabel}>
+                        {t(option === 'buy' ? 'sideBuy' : 'sideSell')}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
               <TextInput
                 value={search}
                 onChangeText={setSearch}
@@ -446,7 +481,7 @@ export default function HomeScreen() {
                 />
                 <FilterBarButton
                   label={t('dealTypeShortLabel')}
-                  value={dealFilter ? t(dealFilter === 'sell' ? 'sellListing' : 'tradeListing') : t('all')}
+                  value={dealFilter ? dealFilterLabel(dealFilter) : t('all')}
                   active={!!dealFilter}
                   onPress={() => setDealPickerOpen(true)}
                 />
@@ -465,7 +500,7 @@ export default function HomeScreen() {
                     : `${filteredListings.length} ${filteredListings.length === 1 ? t('listing') : t('listings')}`}
                 </ThemedText>
 
-                {canBeWatched(watchFilters) && (
+                {side === 'buy' && canBeWatched(watchFilters) && (
                   <Pressable
                     accessibilityLabel={existingWatch ? t('watchActiveButton') : t('watchButton')}
                     disabled={watchSubmitting}
@@ -503,11 +538,28 @@ export default function HomeScreen() {
               ) : (
                 <>
                   <ThemedText style={styles.emptyTitle}>
-                    {listingsError ? t('listingFetchError') : t('noTicketsFound')}
+                    {listingsError
+                      ? t('listingFetchError')
+                      : side === 'buy'
+                        ? t('noTicketsFound')
+                        : t('wantedEmptyTitle')}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" style={styles.emptyCopy}>
-                    {listingsError ?? t('broadenSearch')}
+                    {listingsError ?? (side === 'buy' ? t('offersEmptyCopy') : t('wantedEmptyCopy'))}
                   </ThemedText>
+                  {/* Finding nothing is exactly when a wanted post is worth making,
+                      so this is where "Jag söker" gets preselected. */}
+                  {!listingsError && (
+                    <Pressable
+                      onPress={() =>
+                        router.push(side === 'buy' ? '/sell?direction=wanted' : '/sell')
+                      }
+                      style={({ pressed }) => [styles.emptyCta, { opacity: pressed ? 0.8 : 1 }]}>
+                      <ThemedText style={styles.emptyCtaText}>
+                        {side === 'buy' ? t('postWantedCta') : t('postOfferCta')}
+                      </ThemedText>
+                    </Pressable>
+                  )}
                 </>
               )}
             </ThemedView>
@@ -865,6 +917,7 @@ function DayFilterCalendarModal({
 function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => void }) {
   const theme = useTheme();
   const { language, t } = useI18n();
+  const wanted = listing.direction === 'wanted';
   const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
   const nation = getNation(listing.nationId);
   const nationImage = getNationImage(listing.nationId);
@@ -927,18 +980,27 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
         </View>
 
         <View style={styles.badgeRow}>
+          {wanted && (
+            <View style={[styles.badge, styles.wantedBadge]}>
+              <ThemedText style={styles.wantedBadgeText}>{t('wantedBadge')}</ThemedText>
+            </View>
+          )}
           {isVerifiedOrganizerListing(listing) && <VerifiedOrganizerBadge />}
           {(listing.dealType === 'sell' || listing.dealType === 'both') && (
             <View style={[styles.badge, styles.sellBadge]}>
               <ThemedText style={styles.sellBadgeText}>
-                {listing.price ? `${listing.price} ${t('perTicket')}` : t('forSale')}
+                {listing.price
+                  ? `${wanted ? `${t('wantedPays')} ` : ''}${listing.price} ${t('perTicket')}`
+                  : wanted
+                    ? t('wantedDealBuy')
+                    : t('forSale')}
               </ThemedText>
             </View>
           )}
           {(listing.dealType === 'trade' || listing.dealType === 'both') && (
             <View style={[styles.badge, styles.tradeBadge]}>
               <ThemedText style={styles.tradeBadgeText} numberOfLines={1}>
-                {t('trade')}: {listing.tradeDescription ?? t('suggestion')}
+                {wanted ? t('wantedCanOffer') : t('trade')}: {listing.tradeDescription ?? t('suggestion')}
               </ThemedText>
             </View>
           )}
@@ -1114,7 +1176,10 @@ function ListingModal({
                   )}
                   <Stat label={t('quantity')} value={`${formatTicketQuantity(listing.quantity)} ${t('pcs')}`} />
                   {(listing.dealType === 'sell' || listing.dealType === 'both') && listing.price && (
-                    <Stat label={t('price')} value={`${listing.price} ${t('perTicket')}`} />
+                    <Stat
+                      label={listing.direction === 'wanted' ? t('wantedPays') : t('price')}
+                      value={`${listing.price} ${t('perTicket')}`}
+                    />
                   )}
                   <Stat label={t('posted')} value={formatRelativeTime(listing.createdAt)} />
                 </View>
@@ -1128,7 +1193,9 @@ function ListingModal({
 
                 {listing.tradeDescription && (
                   <>
-                    <ThemedText style={styles.sectionLabel}>{t('tradeWant')}</ThemedText>
+                    <ThemedText style={styles.sectionLabel}>
+                      {listing.direction === 'wanted' ? t('wantedCanOffer') : t('tradeWant')}
+                    </ThemedText>
                     <ThemedText style={styles.description}>{listing.tradeDescription}</ThemedText>
                   </>
                 )}
@@ -1140,7 +1207,9 @@ function ListingModal({
                 ) : (
                   <>
                     <Pressable style={styles.primaryAction} onPress={() => onChat(listing)}>
-                      <ThemedText style={styles.primaryActionText}>💬 {t('contactSeller')}</ThemedText>
+                      <ThemedText style={styles.primaryActionText}>
+                        💬 {listing.direction === 'wanted' ? t('wantedContact') : t('contactSeller')}
+                      </ThemedText>
                     </Pressable>
 
                     <Pressable style={styles.reportLink} onPress={() => onReport(listing)}>
@@ -1222,6 +1291,33 @@ const styles = StyleSheet.create({
   filters: {
     gap: Spacing.two,
     marginBottom: Spacing.one,
+  },
+  sideSegment: {
+    borderRadius: 10,
+    flexDirection: 'row',
+    padding: 3,
+  },
+  sideSegmentItem: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    paddingVertical: Spacing.two,
+  },
+  sideSegmentLabel: {
+    fontWeight: '700',
+  },
+  emptyCta: {
+    alignItems: 'center',
+    backgroundColor: '#1D2430',
+    borderRadius: 999,
+    marginTop: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   resultRow: {
     alignItems: 'center',
@@ -1507,6 +1603,14 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     paddingHorizontal: Spacing.two,
     paddingVertical: 5,
+  },
+  wantedBadge: {
+    backgroundColor: '#FDEBDD',
+  },
+  wantedBadgeText: {
+    color: '#9A4A1C',
+    fontSize: 12,
+    fontWeight: '800',
   },
   sellBadge: {
     backgroundColor: '#E8F6EC',

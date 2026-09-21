@@ -925,9 +925,16 @@ function ListingRow({
       <NationEmblem nationId={listing.nationId} />
 
       <View style={styles.listingCopy}>
-        <ThemedText numberOfLines={1} style={styles.listingTitle}>
-          {listing.eventName}
-        </ThemedText>
+        <View style={styles.listingTitleRow}>
+          {listing.direction === 'wanted' && (
+            <View style={styles.wantedTag}>
+              <ThemedText style={styles.wantedTagText}>{t('wantedBadge')}</ThemedText>
+            </View>
+          )}
+          <ThemedText numberOfLines={1} style={[styles.listingTitle, styles.listingTitleFlex]}>
+            {listing.eventName}
+          </ThemedText>
+        </View>
         <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
           {listingMeta}
         </ThemedText>
@@ -1338,6 +1345,25 @@ const styles = StyleSheet.create({
   listingCopy: {
     flex: 1,
     minWidth: 0,
+  },
+  listingTitleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  listingTitleFlex: {
+    flexShrink: 1,
+  },
+  wantedTag: {
+    backgroundColor: '#FDEBDD',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  wantedTagText: {
+    color: '#9A4A1C',
+    fontSize: 11,
+    fontWeight: '800',
   },
   listingTitle: {
     fontSize: 15,
