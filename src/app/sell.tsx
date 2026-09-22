@@ -28,6 +28,7 @@ import { NATIONS_LIST, getNation, listedWithoutSearch } from '@/lib/nations';
 import {
   DealType,
   ListingDirection,
+  defaultTicketTypeFor,
   preselectedTicketTypeFor,
   ticketTypesFor,
   MORE_THAN_MAX_TICKET_QUANTITY,
@@ -59,14 +60,15 @@ const TOP_EDGES: Edge[] = Platform.OS === 'ios' ? [] : ['top'];
 /**
  * Some organizers preselect their own ticket type — whoever picks
  * Lundakarnevalen is almost certainly selling Efterkarnevalen — and moving to
- * another organizer drops a type it does not have, back to Förköp. A free-text
+ * another organizer drops a type it does not have, back to that organizer's
+ * everyday one (Förköp for a nation, Eftersläpp for a section). A free-text
  * "Annan" is always kept.
  */
 function ticketTypeAfterOrganizerChange(current: string, organizerId: string) {
   if (current === OTHER_TICKET_TYPE) return current;
   const preselected = preselectedTicketTypeFor(organizerId);
   if (preselected) return preselected;
-  return ticketTypesFor(organizerId).includes(current) ? current : ticketTypesFor(null)[0];
+  return ticketTypesFor(organizerId).includes(current) ? current : defaultTicketTypeFor(organizerId);
 }
 
 export default function SellScreen() {
@@ -85,7 +87,7 @@ export default function SellScreen() {
 
   const [nationId, setNationId] = useState('');
   const [customOrganizer, setCustomOrganizer] = useState('');
-  const [ticketType, setTicketType] = useState(ticketTypesFor(null)[0]);
+  const [ticketType, setTicketType] = useState(defaultTicketTypeFor(null));
   const [customTicketType, setCustomTicketType] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -93,7 +95,7 @@ export default function SellScreen() {
   const [price, setPrice] = useState('');
   const [wantedNationId, setWantedNationId] = useState('');
   const [wantedCustomOrganizer, setWantedCustomOrganizer] = useState('');
-  const [wantedTicketType, setWantedTicketType] = useState(ticketTypesFor(null)[0]);
+  const [wantedTicketType, setWantedTicketType] = useState(defaultTicketTypeFor(null));
   const [wantedCustomTicketType, setWantedCustomTicketType] = useState('');
   const [wantedQuantity, setWantedQuantity] = useState(1);
   const [description, setDescription] = useState('');
@@ -209,7 +211,7 @@ export default function SellScreen() {
   function resetForm() {
     setNationId('');
     setCustomOrganizer('');
-    setTicketType(ticketTypesFor(null)[0]);
+    setTicketType(defaultTicketTypeFor(null));
     setCustomTicketType('');
     setEventDate('');
     setQuantity(1);
@@ -217,7 +219,7 @@ export default function SellScreen() {
     setPrice('');
     setWantedNationId('');
     setWantedCustomOrganizer('');
-    setWantedTicketType(ticketTypesFor(null)[0]);
+    setWantedTicketType(defaultTicketTypeFor(null));
     setWantedCustomTicketType('');
     setWantedQuantity(1);
     setDescription('');

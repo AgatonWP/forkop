@@ -1,9 +1,13 @@
+/** Nations and LTH sections sell different kinds of tickets; see ticketTypesFor. */
+export type OrganizerKind = 'nation' | 'section';
+
 export interface Nation {
   id: string;
   name: string;
   shortName: string;
   aliases: string[];
   color: string;
+  kind?: OrganizerKind;
   /**
    * A real organizer, but one so seldom needed that it waits in search rather
    * than taking up a row in every list. It shows up as soon as someone types
@@ -13,36 +17,36 @@ export interface Nation {
 }
 
 export const NATIONS_LIST: Nation[] = [
-  { id: 'helsingkrona', name: 'Helsingkrona Nation', shortName: 'HK', aliases: ['hk', 'helsingkrona', 'helsingkrona nation'], color: '#E53E3E' },
-  { id: 'goteborgs', name: 'Göteborgs Nation', shortName: 'GBG', aliases: ['gbg', 'goteborg', 'göteborg', 'goteborgs', 'göteborgs'], color: '#3B82F6' },
-  { id: 'lunds', name: 'Lunds Nation', shortName: 'LU', aliases: ['ln', 'lu', 'lund', 'lunds'], color: '#22C55E' },
-  { id: 'malmo', name: 'Malmö Nation', shortName: 'MN', aliases: ['mn', 'malmo', 'malmö', 'casa'], color: '#D97706' },
-  { id: 'ostgota', name: 'Östgöta Nation', shortName: 'ÖG', aliases: ['og', 'ög', 'ostgota', 'östgöta', 'ostgota nation'], color: '#7C3AED' },
-  { id: 'sydskanska', name: 'Sydskånska Nation', shortName: 'SS', aliases: ['ss', 'sydskanska', 'sydskånska', 'syd'], color: '#0284C7' },
-  { id: 'vg', name: 'Västgöta Nation', shortName: 'VG', aliases: ['vg', 'vastgota', 'västgöta', 'vastgota nation'], color: '#DB2777' },
-  { id: 'blekingska', name: 'Blekingska Nation', shortName: 'BL', aliases: ['bl', 'bn', 'blekinge', 'blekingska'], color: '#0D9488' },
-  { id: 'kristianstad', name: 'Kristianstads Nation', shortName: 'KR', aliases: ['kr', 'kn', 'kristianstad', 'krischan', 'krischanstad'], color: '#EA580C' },
-  { id: 'hallands', name: 'Hallands Nation', shortName: 'HL', aliases: ['hl', 'hn', 'halland', 'hallands'], color: '#2563EB' },
-  { id: 'kalmar', name: 'Kalmar Nation', shortName: 'KA', aliases: ['ka', 'kn', 'kalmar'], color: '#B45309' },
-  { id: 'wermlands', name: 'Wermlands Nation', shortName: 'WN', aliases: ['wn', 'wermlands', 'värmlands', 'varmlands', 'wermland'], color: '#1D4ED8' },
-  { id: 'smalands', name: 'Smålands Nation', shortName: 'SM', aliases: ['sm', 'sn', 'smalands', 'smålands'], color: '#15803D' },
+  { id: 'helsingkrona', name: 'Helsingkrona Nation', shortName: 'HK', aliases: ['hk', 'helsingkrona', 'helsingkrona nation'], color: '#E53E3E', kind: 'nation' },
+  { id: 'goteborgs', name: 'Göteborgs Nation', shortName: 'GBG', aliases: ['gbg', 'goteborg', 'göteborg', 'goteborgs', 'göteborgs'], color: '#3B82F6', kind: 'nation' },
+  { id: 'lunds', name: 'Lunds Nation', shortName: 'LU', aliases: ['ln', 'lu', 'lund', 'lunds'], color: '#22C55E', kind: 'nation' },
+  { id: 'malmo', name: 'Malmö Nation', shortName: 'MN', aliases: ['mn', 'malmo', 'malmö', 'casa'], color: '#D97706', kind: 'nation' },
+  { id: 'ostgota', name: 'Östgöta Nation', shortName: 'ÖG', aliases: ['og', 'ög', 'ostgota', 'östgöta', 'ostgota nation'], color: '#7C3AED', kind: 'nation' },
+  { id: 'sydskanska', name: 'Sydskånska Nation', shortName: 'SS', aliases: ['ss', 'sydskanska', 'sydskånska', 'syd'], color: '#0284C7', kind: 'nation' },
+  { id: 'vg', name: 'Västgöta Nation', shortName: 'VG', aliases: ['vg', 'vastgota', 'västgöta', 'vastgota nation'], color: '#DB2777', kind: 'nation' },
+  { id: 'blekingska', name: 'Blekingska Nation', shortName: 'BL', aliases: ['bl', 'bn', 'blekinge', 'blekingska'], color: '#0D9488', kind: 'nation' },
+  { id: 'kristianstad', name: 'Kristianstads Nation', shortName: 'KR', aliases: ['kr', 'kn', 'kristianstad', 'krischan', 'krischanstad'], color: '#EA580C', kind: 'nation' },
+  { id: 'hallands', name: 'Hallands Nation', shortName: 'HL', aliases: ['hl', 'hn', 'halland', 'hallands'], color: '#2563EB', kind: 'nation' },
+  { id: 'kalmar', name: 'Kalmar Nation', shortName: 'KA', aliases: ['ka', 'kn', 'kalmar'], color: '#B45309', kind: 'nation' },
+  { id: 'wermlands', name: 'Wermlands Nation', shortName: 'WN', aliases: ['wn', 'wermlands', 'värmlands', 'varmlands', 'wermland'], color: '#1D4ED8', kind: 'nation' },
+  { id: 'smalands', name: 'Smålands Nation', shortName: 'SM', aliases: ['sm', 'sn', 'smalands', 'smålands'], color: '#15803D', kind: 'nation' },
   // Karnevalen comes round every four years, so it is searchable rather than listed.
   { id: 'karneval', name: 'Lundakarnevalen', shortName: 'LK', aliases: ['lk', 'karneval', 'lundakarnevalen'], color: '#DC2626', searchOnly: true },
   { id: 'afborgen', name: 'AF-borgen', shortName: 'AF', aliases: ['af', 'afb', 'af borgen', 'af-borgen', 'borgen', 'tbar', 't-bar', 'tibban'], color: '#C2410C' },
   { id: 'mejeriet', name: 'Mejeriet', shortName: 'MJ', aliases: ['mj', 'mejeri', 'mejeriet'], color: '#6D28D9' },
   { id: 'stadsparken', name: 'Stadsparken', shortName: 'SP', aliases: ['sp', 'stadsparken', 'stadspark'], color: '#16A34A' },
   // LTH:s kårsektioner (TLTH)
-  { id: 'f-sektionen', name: 'F-sektionen', shortName: 'F', aliases: ['f', 'f-sektionen', 'teknisk fysik', 'teknisk matematik', 'teknisk nanovetenskap', 'fysik'], color: '#F59E0B' },
-  { id: 'e-sektionen', name: 'E-sektionen', shortName: 'E', aliases: ['e', 'e-sektionen', 'elektroteknik', 'medicin och teknik'], color: '#059669' },
-  { id: 'maskinsektionen', name: 'Maskinsektionen', shortName: 'M', aliases: ['m', 'maskin', 'maskinsektionen', 'maskinteknik'], color: '#EF4444' },
-  { id: 'v-sektionen', name: 'V-sektionen', shortName: 'V', aliases: ['v', 'v-sektionen', 'väg- och vattenbyggnad', 'vag- och vattenbyggnad', 'lantmäteri', 'lantmateri', 'brandingenjör', 'brandingenjor', 'riskhantering'], color: '#0EA5E9' },
-  { id: 'a-sektionen', name: 'A-sektionen', shortName: 'A', aliases: ['a', 'a-sektionen', 'arkitektur', 'industridesign'], color: '#EC4899' },
-  { id: 'k-sektionen', name: 'K-sektionen', shortName: 'K', aliases: ['k', 'k-sektionen', 'kemiteknik', 'bioteknik', 'livsmedelsteknik'], color: '#14B8A6' },
-  { id: 'd-sektionen', name: 'D-sektionen', shortName: 'D', aliases: ['d', 'd-sektionen', 'datateknik', 'informations- och kommunikationsteknik', 'ikt'], color: '#6366F1' },
-  { id: 'dokt-sektionen', name: 'Dokt-sektionen', shortName: 'Dokt', aliases: ['dokt', 'dokt-sektionen', 'doktorander'], color: '#78716C' },
-  { id: 'ingenjorssektionen', name: 'Ingenjörssektionen', shortName: 'Ing', aliases: ['ing', 'ingenjörssektionen', 'ingenjorssektionen', 'högskoleingenjör', 'hogskoleingenjor', 'basår', 'basar'], color: '#A855F7' },
-  { id: 'w-sektionen', name: 'W-sektionen', shortName: 'W', aliases: ['w', 'w-sektionen', 'ekosystemteknik', 'risk säkerhet och krishantering'], color: '#84CC16' },
-  { id: 'i-sektionen', name: 'I-sektionen', shortName: 'I', aliases: ['i', 'i-sektionen', 'industriell ekonomi'], color: '#F97316' },
+  { id: 'f-sektionen', name: 'F-sektionen', shortName: 'F', aliases: ['f', 'f-sektionen', 'teknisk fysik', 'teknisk matematik', 'teknisk nanovetenskap', 'fysik'], color: '#F59E0B', kind: 'section' },
+  { id: 'e-sektionen', name: 'E-sektionen', shortName: 'E', aliases: ['e', 'e-sektionen', 'elektroteknik', 'medicin och teknik'], color: '#059669', kind: 'section' },
+  { id: 'maskinsektionen', name: 'Maskinsektionen', shortName: 'M', aliases: ['m', 'maskin', 'maskinsektionen', 'maskinteknik'], color: '#EF4444', kind: 'section' },
+  { id: 'v-sektionen', name: 'V-sektionen', shortName: 'V', aliases: ['v', 'v-sektionen', 'väg- och vattenbyggnad', 'vag- och vattenbyggnad', 'lantmäteri', 'lantmateri', 'brandingenjör', 'brandingenjor', 'riskhantering'], color: '#0EA5E9', kind: 'section' },
+  { id: 'a-sektionen', name: 'A-sektionen', shortName: 'A', aliases: ['a', 'a-sektionen', 'arkitektur', 'industridesign'], color: '#EC4899', kind: 'section' },
+  { id: 'k-sektionen', name: 'K-sektionen', shortName: 'K', aliases: ['k', 'k-sektionen', 'kemiteknik', 'bioteknik', 'livsmedelsteknik'], color: '#14B8A6', kind: 'section' },
+  { id: 'd-sektionen', name: 'D-sektionen', shortName: 'D', aliases: ['d', 'd-sektionen', 'datateknik', 'informations- och kommunikationsteknik', 'ikt'], color: '#6366F1', kind: 'section' },
+  { id: 'dokt-sektionen', name: 'Dokt-sektionen', shortName: 'Dokt', aliases: ['dokt', 'dokt-sektionen', 'doktorander'], color: '#78716C', kind: 'section' },
+  { id: 'ingenjorssektionen', name: 'Ingenjörssektionen', shortName: 'Ing', aliases: ['ing', 'ingenjörssektionen', 'ingenjorssektionen', 'högskoleingenjör', 'hogskoleingenjor', 'basår', 'basar'], color: '#A855F7', kind: 'section' },
+  { id: 'w-sektionen', name: 'W-sektionen', shortName: 'W', aliases: ['w', 'w-sektionen', 'ekosystemteknik', 'risk säkerhet och krishantering'], color: '#84CC16', kind: 'section' },
+  { id: 'i-sektionen', name: 'I-sektionen', shortName: 'I', aliases: ['i', 'i-sektionen', 'industriell ekonomi'], color: '#F97316', kind: 'section' },
   { id: 'other', name: 'Annat', shortName: '??', aliases: ['annat', 'annan', 'other', 'ovrigt', 'övrigt'], color: '#6B7280' },
 ];
 

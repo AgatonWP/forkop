@@ -1,4 +1,4 @@
-import { getNation } from '@/lib/nations';
+import { OrganizerKind, getNation } from '@/lib/nations';
 import { TranslationKey } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
@@ -63,15 +63,25 @@ export type Listing = {
   sellerAvatarUrl?: string;
 };
 
-/** Ticket types every organizer sells. The form adds the free-text 'Annan' last. */
-export const BASE_TICKET_TYPES = ['Förköp', 'Eftersläpp'];
+/**
+ * Everyday ticket types by kind of organizer. Nations sell förköp but have no
+ * eftersläpp; the LTH sections sell eftersläpp and sittningar rather than
+ * förköp. Everyone else — venues, and "Annat" — gets the general pair. The
+ * first of each list is what the form falls back to, and it adds the free-text
+ * 'Annan' last.
+ */
+const GENERAL_TICKET_TYPES = ['Förköp', 'Eftersläpp'];
+const KIND_TICKET_TYPES: Record<OrganizerKind, string[]> = {
+  nation: ['Förköp'],
+  section: ['Eftersläpp', 'Sittning'],
+};
 
 type OrganizerTicketTypes = {
   types: string[];
   /**
    * Picking the organizer selects the first of these, for organizers where
-   * that is nearly always what is being sold. Otherwise the form stays on
-   * Förköp and these are just offered at the top of the list.
+   * that is nearly always what is being sold. Otherwise the form stays on the
+   * everyday type and these are just offered at the top of the list.
    */
   preselect?: boolean;
 };
@@ -80,7 +90,7 @@ type OrganizerTicketTypes = {
  * Types particular to one organizer, offered first once it is picked.
  * Lundakarnevalen's Efterkarnevalen was being posted as "Förköp" with its real
  * name buried in the description, where neither the ticket filter nor search
- * could reach it. Add an organizer here when it sells something the two base
+ * could reach it. Add an organizer here when it sells something its everyday
  * types do not describe.
  */
 const ORGANIZER_TICKET_TYPES: Record<string, OrganizerTicketTypes> = {
@@ -90,9 +100,19 @@ const ORGANIZER_TICKET_TYPES: Record<string, OrganizerTicketTypes> = {
   malmo: { types: ['September Haze', 'Höstyran'] },
 };
 
+function everydayTicketTypesFor(organizerId: string | null | undefined) {
+  const kind = organizerId ? getNation(organizerId).kind : undefined;
+  return kind ? KIND_TICKET_TYPES[kind] : GENERAL_TICKET_TYPES;
+}
+
 export function ticketTypesFor(organizerId: string | null | undefined): string[] {
   const special = organizerId ? (ORGANIZER_TICKET_TYPES[organizerId]?.types ?? []) : [];
-  return [...special, ...BASE_TICKET_TYPES];
+  return [...special, ...everydayTicketTypesFor(organizerId)];
+}
+
+/** The type the form starts on, or falls back to, for this organizer. */
+export function defaultTicketTypeFor(organizerId: string | null | undefined): string {
+  return everydayTicketTypesFor(organizerId)[0];
 }
 
 /** The type to select when this organizer is picked, if it has one. */
@@ -101,10 +121,17 @@ export function preselectedTicketTypeFor(organizerId: string): string | null {
   return special?.preselect ? special.types[0] : null;
 }
 
-/** Every ticket type the feed's filter offers. */
+/**
+ * Every ticket type the feed's filter offers. Eftersläpp stays even though
+ * nations no longer offer it: sections do, and older nation listings still
+ * carry it.
+ */
 export const FILTERABLE_TICKET_TYPES = [
-  ...BASE_TICKET_TYPES,
-  ...Object.values(ORGANIZER_TICKET_TYPES).flatMap(({ types }) => types),
+  ...new Set([
+    ...GENERAL_TICKET_TYPES,
+    ...Object.values(KIND_TICKET_TYPES).flat(),
+    ...Object.values(ORGANIZER_TICKET_TYPES).flatMap(({ types }) => types),
+  ]),
 ];
 
 export const MAX_EXACT_TICKET_QUANTITY = 20;
