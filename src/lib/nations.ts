@@ -1,5 +1,5 @@
-/** Nations and LTH sections sell different kinds of tickets; see ticketTypesFor. */
-export type OrganizerKind = 'nation' | 'section';
+/** Nations, LTH sections and clubs sell different kinds of tickets; see ticketTypesFor. */
+export type OrganizerKind = 'nation' | 'section' | 'club';
 
 export interface Nation {
   id: string;
@@ -34,7 +34,10 @@ export const NATIONS_LIST: Nation[] = [
   { id: 'smalands', name: 'Smålands Nation', shortName: 'SM', aliases: ['sm', 'sn', 'smalands', 'smålands'], color: '#15803D', kind: 'nation' },
   // Karnevalen comes round every four years, so it is searchable rather than listed.
   { id: 'karneval', name: 'Lundakarnevalen', shortName: 'LK', aliases: ['lk', 'karneval', 'lundakarnevalen'], color: '#DC2626', searchOnly: true },
-  { id: 'afborgen', name: 'AF-borgen', shortName: 'AF', aliases: ['af', 'afb', 'af borgen', 'af-borgen', 'borgen', 'tbar', 't-bar', 'tibban'], color: '#C2410C' },
+  { id: 'afborgen', name: 'AF-borgen', shortName: 'AF', aliases: ['af', 'afb', 'af borgen', 'af-borgen', 'borgen'], color: '#C2410C' },
+  // The club in AF-borgen. Its names used to be aliases of AF-borgen, which
+  // left its tickets under the building rather than the club.
+  { id: 'tbar', name: 'T-bar', shortName: 'TB', aliases: ['tb', 'tbar', 't-bar', 't bar', 'tibban'], color: '#9D174D', kind: 'club' },
   { id: 'mejeriet', name: 'Mejeriet', shortName: 'MJ', aliases: ['mj', 'mejeri', 'mejeriet'], color: '#6D28D9' },
   { id: 'stadsparken', name: 'Stadsparken', shortName: 'SP', aliases: ['sp', 'stadsparken', 'stadspark'], color: '#16A34A' },
   // The hall in Kårhuset at LTH where the sections hold their eftersläpp.

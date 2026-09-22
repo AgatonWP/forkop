@@ -64,16 +64,17 @@ export type Listing = {
 };
 
 /**
- * Everyday ticket types by kind of organizer. Nations sell förköp but have no
- * eftersläpp; the LTH sections sell eftersläpp and sittningar rather than
- * förköp. Everyone else — venues, and "Annat" — gets the general pair. The
- * first of each list is what the form falls back to, and it adds the free-text
- * 'Annan' last.
+ * Everyday ticket types by kind of organizer. Nations and clubs sell förköp but
+ * have no eftersläpp; the LTH sections sell eftersläpp and sittningar rather
+ * than förköp. Everyone else — venues, and "Annat" — gets the general pair.
+ * The first of each list is what the form falls back to, and it adds the
+ * free-text 'Annan' last.
  */
 const GENERAL_TICKET_TYPES = ['Förköp', 'Eftersläpp'];
 const KIND_TICKET_TYPES: Record<OrganizerKind, string[]> = {
   nation: ['Förköp'],
   section: ['Eftersläpp', 'Sittning'],
+  club: ['Förköp'],
 };
 
 type OrganizerTicketTypes = {
