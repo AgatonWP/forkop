@@ -416,7 +416,12 @@ export default function HomeScreen() {
               <Logo />
             </View>
             <View style={[styles.headerSide, styles.headerSideRight]}>
-              <AddButton accessibilityLabel={t('sell')} onPress={() => router.push('/sell')} />
+              {/* Posts the kind of listing on screen: an offer under Köp, a
+                  wanted post under Sälj, where the wanted posts are listed. */}
+              <AddButton
+                accessibilityLabel={t('sell')}
+                onPress={() => router.push(side === 'sell' ? '/sell?direction=wanted' : '/sell')}
+              />
             </View>
           </View>
         </View>
