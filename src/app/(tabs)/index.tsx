@@ -8,6 +8,7 @@ import {
   Easing,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -34,7 +35,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { TranslationKey, useI18n } from '@/lib/i18n';
-import { NATIONS_LIST, getNation, nationMatchesQuery, normalizeSearchText } from '@/lib/nations';
+import { NATIONS_LIST, getNation, getNationSearchText, normalizeSearchText } from '@/lib/nations';
 import { getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
 import {
@@ -46,6 +47,7 @@ import {
 import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 import { ReportModal } from '@/components/report-modal';
 import {
+  FILTERABLE_TICKET_TYPES,
   Listing,
   daysFromToday,
   fetchActiveListings,
@@ -57,10 +59,7 @@ import {
   toLocalDateId,
 } from '@/lib/tickets';
 
-const TICKET_TYPE_FILTERS = [
-  { id: 'Förköp', label: 'Förköp' },
-  { id: 'Eftersläpp', label: 'Eftersläpp' },
-];
+const TICKET_TYPE_FILTERS = FILTERABLE_TICKET_TYPES.map((type) => ({ id: type, label: type }));
 
 const DEAL_FILTERS = [
   { id: 'sell', translationKey: 'sellListing' },
@@ -218,7 +217,11 @@ export default function HomeScreen() {
   }, [dayFilter, language, t]);
 
   const filteredListings = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    // Every word has to turn up somewhere in the listing — its name, ticket
+    // type, description, what it trades for, or the organizer's aliases — so
+    // "förköp casa" finds Malmö's förköp, and a ticket whose real name only
+    // appears in the description ("efterkarnevalen") is still found.
+    const queryWords = normalizeSearchText(search.trim()).split(/\s+/).filter(Boolean);
 
     return listings
       .filter((listing) => !listing.isSold && listing.direction === sideDirection)
@@ -240,12 +243,17 @@ export default function HomeScreen() {
         return !!listing.eventDate && dayFilter.has(listing.eventDate);
       })
       .filter((listing) => {
-        if (!query) return true;
-        const nation = getNation(listing.nationId);
-        return (
-          listing.eventName.toLowerCase().includes(query) ||
-          nationMatchesQuery(nation, query)
+        if (queryWords.length === 0) return true;
+        const haystack = normalizeSearchText(
+          [
+            listing.eventName,
+            listing.ticketType,
+            listing.description,
+            listing.tradeDescription ?? '',
+            getNationSearchText(getNation(listing.nationId)),
+          ].join(' '),
         );
+        return queryWords.every((word) => haystack.includes(word));
       })
       .sort((a, b) => {
         const aDiff = a.eventDate ? daysFromToday(a.eventDate) : null;
@@ -429,7 +437,10 @@ export default function HomeScreen() {
           ]}
           ListHeaderComponent={
             <View style={styles.filters}>
-              <View style={[styles.sideSegment, { backgroundColor: theme.backgroundSelected }]}>
+              {/* Dark enough to read as the page's main control, small enough
+                  not to push the listings down. Fixed colours rather than theme
+                  ones: it is its own dark surface in both light and dark mode. */}
+              <View style={styles.sideSegment}>
                 {(['buy', 'sell'] as const).map((option) => {
                   const active = side === option;
 
@@ -439,11 +450,9 @@ export default function HomeScreen() {
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       onPress={() => setSide(option)}
-                      style={[styles.sideSegmentItem, active && { backgroundColor: theme.backgroundElement }]}>
+                      style={[styles.sideSegmentItem, active && styles.sideSegmentItemActive]}>
                       <ThemedText
-                        type="small"
-                        themeColor={active ? 'text' : 'textSecondary'}
-                        style={styles.sideSegmentLabel}>
+                        style={[styles.sideSegmentLabel, active && styles.sideSegmentLabelActive]}>
                         {t(option === 'buy' ? 'sideBuy' : 'sideSell')}
                       </ThemedText>
                     </Pressable>
@@ -705,7 +714,7 @@ function FilterOptionModal({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalBackdrop}>
         <Pressable accessibilityLabel="Stäng" onPress={onClose} style={styles.modalBackdropPressable} />
         <ThemedView
           type="backgroundElement"
@@ -769,7 +778,7 @@ function FilterOptionModal({
             )}
           </ScrollView>
         </ThemedView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1293,18 +1302,29 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.one,
   },
   sideSegment: {
-    borderRadius: 10,
+    alignSelf: 'center',
+    backgroundColor: '#3A4452',
+    borderRadius: 999,
     flexDirection: 'row',
     padding: 3,
   },
   sideSegmentItem: {
     alignItems: 'center',
-    borderRadius: 8,
-    flex: 1,
-    paddingVertical: Spacing.two,
+    borderRadius: 999,
+    paddingHorizontal: 26,
+    paddingVertical: 5,
+  },
+  sideSegmentItemActive: {
+    backgroundColor: '#FFFFFF',
   },
   sideSegmentLabel: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
     fontWeight: '700',
+    lineHeight: 18,
+  },
+  sideSegmentLabelActive: {
+    color: '#1D2430',
   },
   emptyCta: {
     alignItems: 'center',

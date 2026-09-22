@@ -1,7 +1,18 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -269,282 +280,269 @@ export default function SettingsScreen() {
         </View>
       </SafeAreaView>
 
-      <ScrollView
-        style={[styles.scrollView, { backgroundColor: theme.background }]}
-        contentContainerStyle={[
-          styles.contentContainer,
-          { paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four },
-        ]}>
-        <View style={styles.container}>
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t('profile')}</ThemedText>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoider}>
+        <ScrollView
+          style={[styles.scrollView, { backgroundColor: theme.background }]}
+          contentContainerStyle={[
+            styles.contentContainer,
+            { paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four },
+          ]}>
+          <View style={styles.container}>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>{t('profile')}</ThemedText>
 
-            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <View style={styles.avatarRow}>
-                <Pressable disabled={avatarUploading} onPress={handleChangeAvatar} style={styles.avatarTouchable}>
-                  {avatarUrl ? (
-                    <Image source={{ uri: avatarUrl }} style={styles.avatarImage} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.avatarFallback, { backgroundColor: theme.backgroundSelected }]}>
-                      <ThemedText style={styles.avatarFallbackText} themeColor="textSecondary">
-                        {(fullName?.[0] ?? user?.email?.[0] ?? 'T').toUpperCase()}
+              <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <View style={styles.avatarRow}>
+                  <Pressable disabled={avatarUploading} onPress={handleChangeAvatar} style={styles.avatarTouchable}>
+                    {avatarUrl ? (
+                      <Image source={{ uri: avatarUrl }} style={styles.avatarImage} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.avatarFallback, { backgroundColor: theme.backgroundSelected }]}>
+                        <ThemedText style={styles.avatarFallbackText} themeColor="textSecondary">
+                          {(fullName?.[0] ?? user?.email?.[0] ?? 'T').toUpperCase()}
+                        </ThemedText>
+                      </View>
+                    )}
+                    {avatarUploading && (
+                      <View style={styles.avatarOverlay}>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      </View>
+                    )}
+                  </Pressable>
+                  <View style={styles.avatarCopy}>
+                    <ThemedText style={styles.avatarTitle}>{t('profilePictureLabel')}</ThemedText>
+                    <Pressable disabled={avatarUploading} onPress={handleChangeAvatar}>
+                      <ThemedText style={styles.avatarAction}>
+                        {avatarUploading ? t('uploadingLabel') : t('changePicture')}
                       </ThemedText>
-                    </View>
-                  )}
-                  {avatarUploading && (
-                    <View style={styles.avatarOverlay}>
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    </View>
-                  )}
-                </Pressable>
-                <View style={styles.avatarCopy}>
-                  <ThemedText style={styles.avatarTitle}>{t('profilePictureLabel')}</ThemedText>
-                  <Pressable disabled={avatarUploading} onPress={handleChangeAvatar}>
-                    <ThemedText style={styles.avatarAction}>
-                      {avatarUploading ? t('uploadingLabel') : t('changePicture')}
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-              {avatarError && <ThemedText style={styles.errorText}>{avatarError}</ThemedText>}
-
-              <View style={styles.nameRow}>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  {t('displayNameLabel')}
-                </ThemedText>
-                <View style={styles.nameInputRow}>
-                  <TextInput
-                    maxLength={MAX_DISPLAY_NAME_LENGTH}
-                    onChangeText={(text) => {
-                      setFullName(text.replace(/[^\p{L}\s]/gu, ''));
-                      setNameSaved(false);
-                    }}
-                    placeholder={t('namePlaceholder')}
-                    placeholderTextColor={theme.textSecondary}
-                    style={[
-                      styles.input,
-                      styles.nameInput,
-                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                    ]}
-                    value={fullName}
-                  />
-                  <Pressable
-                    disabled={nameSaving || !fullName.trim()}
-                    onPress={handleSaveName}
-                    style={[styles.saveButton, { opacity: nameSaving || !fullName.trim() ? 0.55 : 1 }]}>
-                    <ThemedText style={styles.saveButtonText}>
-                      {nameSaving ? t('savingLabel') : nameSaved ? t('savedLabel') : t('saveNameButton')}
-                    </ThemedText>
-                  </Pressable>
-                </View>
-                {nameError && <ThemedText style={styles.errorText}>{nameError}</ThemedText>}
-              </View>
-
-              <View style={styles.nameRow}>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  {t('swishNumberLabel')}
-                </ThemedText>
-                <View style={styles.nameInputRow}>
-                  <TextInput
-                    onChangeText={(text) => {
-                      const cleaned = text.replace(/[^\d\s+-]/g, '');
-                      // Same ceiling as the signup field: E.164 allows 15 digits.
-                      if (countSwishDigits(cleaned) > MAX_SWISH_DIGITS) return;
-                      setSwishNumber(cleaned);
-                      setSwishSaved(false);
-                    }}
-                    placeholder={t('swishNumberPlaceholder')}
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="phone-pad"
-                    style={[
-                      styles.input,
-                      styles.nameInput,
-                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                    ]}
-                    value={swishNumber}
-                  />
-                  <Pressable
-                    disabled={swishSaving}
-                    onPress={handleSaveSwish}
-                    style={[styles.saveButton, { opacity: swishSaving ? 0.55 : 1 }]}>
-                    <ThemedText style={styles.saveButtonText}>
-                      {swishSaving ? t('savingLabel') : swishSaved ? t('savedLabel') : t('saveNameButton')}
-                    </ThemedText>
-                  </Pressable>
-                  {swishNumber.trim().length > 0 && (
-                    <Pressable
-                      disabled={swishDeleting}
-                      onPress={handleDeleteSwish}
-                      style={[styles.deleteSwishButton, swishDeleting && styles.buttonDisabled]}>
-                      {swishDeleting ? (
-                        <ActivityIndicator size="small" color="#C84646" />
-                      ) : (
-                        <ThemedText style={styles.deleteSwishButtonText}>✕</ThemedText>
-                      )}
                     </Pressable>
-                  )}
+                  </View>
                 </View>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {t('swishNumberHint')}
-                </ThemedText>
-                {swishError && <ThemedText style={styles.errorText}>{swishError}</ThemedText>}
+                {avatarError && <ThemedText style={styles.errorText}>{avatarError}</ThemedText>}
+
+                <View style={styles.nameRow}>
+                  <ThemedText type="smallBold" themeColor="textSecondary">
+                    {t('displayNameLabel')}
+                  </ThemedText>
+                  <View style={styles.nameInputRow}>
+                    <TextInput
+                      maxLength={MAX_DISPLAY_NAME_LENGTH}
+                      onChangeText={(text) => {
+                        setFullName(text.replace(/[^\p{L}\s]/gu, ''));
+                        setNameSaved(false);
+                      }}
+                      placeholder={t('namePlaceholder')}
+                      placeholderTextColor={theme.textSecondary}
+                      style={[
+                        styles.input,
+                        styles.nameInput,
+                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      ]}
+                      value={fullName}
+                    />
+                    <Pressable
+                      disabled={nameSaving || !fullName.trim()}
+                      onPress={handleSaveName}
+                      style={[styles.saveButton, { opacity: nameSaving || !fullName.trim() ? 0.55 : 1 }]}>
+                      <ThemedText style={styles.saveButtonText}>
+                        {nameSaving ? t('savingLabel') : nameSaved ? t('savedLabel') : t('saveNameButton')}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                  {nameError && <ThemedText style={styles.errorText}>{nameError}</ThemedText>}
+                </View>
+
+                <View style={styles.nameRow}>
+                  <ThemedText type="smallBold" themeColor="textSecondary">
+                    {t('swishNumberLabel')}
+                  </ThemedText>
+                  <View style={styles.nameInputRow}>
+                    <TextInput
+                      onChangeText={(text) => {
+                        const cleaned = text.replace(/[^\d\s+-]/g, '');
+                        // Same ceiling as the signup field: E.164 allows 15 digits.
+                        if (countSwishDigits(cleaned) > MAX_SWISH_DIGITS) return;
+                        setSwishNumber(cleaned);
+                        setSwishSaved(false);
+                      }}
+                      placeholder={t('swishNumberPlaceholder')}
+                      placeholderTextColor={theme.textSecondary}
+                      keyboardType="phone-pad"
+                      style={[
+                        styles.input,
+                        styles.nameInput,
+                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      ]}
+                      value={swishNumber}
+                    />
+                    <Pressable
+                      disabled={swishSaving}
+                      onPress={handleSaveSwish}
+                      style={[styles.saveButton, { opacity: swishSaving ? 0.55 : 1 }]}>
+                      <ThemedText style={styles.saveButtonText}>
+                        {swishSaving ? t('savingLabel') : swishSaved ? t('savedLabel') : t('saveNameButton')}
+                      </ThemedText>
+                    </Pressable>
+                    {swishNumber.trim().length > 0 && (
+                      <Pressable
+                        disabled={swishDeleting}
+                        onPress={handleDeleteSwish}
+                        style={[styles.deleteSwishButton, swishDeleting && styles.buttonDisabled]}>
+                        {swishDeleting ? (
+                          <ActivityIndicator size="small" color="#C84646" />
+                        ) : (
+                          <ThemedText style={styles.deleteSwishButtonText}>✕</ThemedText>
+                        )}
+                      </Pressable>
+                    )}
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('swishNumberHint')}
+                  </ThemedText>
+                  {swishError && <ThemedText style={styles.errorText}>{swishError}</ThemedText>}
+                </View>
               </View>
             </View>
-          </View>
 
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t('notificationsSection')}</ThemedText>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>{t('notificationsSection')}</ThemedText>
 
-            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <View style={styles.switchRow}>
-                <View style={styles.switchCopy}>
-                  <ThemedText style={styles.switchTitle}>{t('pushNotifTitle')}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {t('pushNotifCopy')}
-                  </ThemedText>
+              <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <View style={styles.switchRow}>
+                  <View style={styles.switchCopy}>
+                    <ThemedText style={styles.switchTitle}>{t('pushNotifTitle')}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {t('pushNotifCopy')}
+                    </ThemedText>
+                  </View>
+                  {pushLoading ? (
+                    <ActivityIndicator size="small" color={theme.textSecondary} />
+                  ) : (
+                    <Switch
+                      disabled={pushSubmitting}
+                      onValueChange={handleTogglePush}
+                      ios_backgroundColor="#B7BEC9"
+                      thumbColor="#FFFFFF"
+                      trackColor={{ false: '#B7BEC9', true: '#4F6FB7' }}
+                      value={pushEnabled}
+                    />
+                  )}
                 </View>
-                {pushLoading ? (
-                  <ActivityIndicator size="small" color={theme.textSecondary} />
-                ) : (
-                  <Switch
-                    disabled={pushSubmitting}
-                    onValueChange={handleTogglePush}
-                    ios_backgroundColor="#B7BEC9"
-                    thumbColor="#FFFFFF"
-                    trackColor={{ false: '#B7BEC9', true: '#4F6FB7' }}
-                    value={pushEnabled}
+                {pushError && <ThemedText style={styles.errorText}>{pushError}</ThemedText>}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>{t('appearanceSection')}</ThemedText>
+
+              <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <View style={styles.settingRow}>
+                  <ThemedText style={styles.switchTitle}>{t('languageLabel')}</ThemedText>
+                  <SegmentedControl
+                    options={[
+                      { id: 'sv', label: 'Svenska' },
+                      { id: 'en', label: 'English' },
+                    ]}
+                    value={language}
+                    onChange={(id) => setLanguage(id as Language)}
                   />
+                </View>
+
+                <View style={styles.settingRow}>
+                  <ThemedText style={styles.switchTitle}>{t('themeLabel')}</ThemedText>
+                  <SegmentedControl
+                    options={[
+                      { id: 'light', label: t('themeLight') },
+                      { id: 'dark', label: t('themeDark') },
+                    ]}
+                    value={themeMode}
+                    onChange={(id) => setThemeMode(id as ThemeMode)}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>{t('legalSection')}</ThemedText>
+
+              <View style={[styles.card, styles.legalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <LegalLink label={t('privacyPolicy')} onPress={() => router.push('./privacy')} />
+                <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
+                <LegalLink label={t('termsOfUse')} onPress={() => router.push('./terms')} />
+                <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
+                <LegalLink label={t('support')} onPress={() => router.push('./support')} />
+                {isAdmin && (
+                  <>
+                    <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
+                    <LegalLink label="Admin" onPress={() => router.push('./admin')} />
+                  </>
                 )}
               </View>
-              {pushError && <ThemedText style={styles.errorText}>{pushError}</ThemedText>}
+            </View>
 
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => router.push('./watches')}
-                style={styles.switchRow}>
-                <View style={styles.switchCopy}>
-                  <ThemedText style={styles.switchTitle}>{t('watchesLink')}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {t('watchesLinkCopy')}
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>{t('securitySection')}</ThemedText>
+
+              <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <View style={styles.nameRow}>
+                  <ThemedText type="smallBold" themeColor="textSecondary">
+                    {t('newPasswordLabel')}
                   </ThemedText>
+                  <View style={styles.nameInputRow}>
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(text) => {
+                        setNewPassword(text);
+                        setPasswordSaved(false);
+                      }}
+                      placeholder={t('newPasswordPlaceholder')}
+                      placeholderTextColor={theme.textSecondary}
+                      secureTextEntry
+                      style={[
+                        styles.input,
+                        styles.nameInput,
+                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                      ]}
+                      value={newPassword}
+                    />
+                    <Pressable
+                      disabled={passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH}
+                      onPress={handleChangePassword}
+                      style={[styles.saveButton, { opacity: passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH ? 0.55 : 1 }]}>
+                      <ThemedText style={styles.saveButtonText}>
+                        {passwordSaving ? t('savingLabel') : passwordSaved ? t('savedLabel') : t('saveNameButton')}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('newPasswordHint')}
+                  </ThemedText>
+                  {passwordError && <ThemedText style={styles.errorText}>{passwordError}</ThemedText>}
                 </View>
-                <ThemedText style={styles.legalChevron} themeColor="textSecondary">
-                  ›
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t('appearanceSection')}</ThemedText>
-
-            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <View style={styles.settingRow}>
-                <ThemedText style={styles.switchTitle}>{t('languageLabel')}</ThemedText>
-                <SegmentedControl
-                  options={[
-                    { id: 'sv', label: 'Svenska' },
-                    { id: 'en', label: 'English' },
-                  ]}
-                  value={language}
-                  onChange={(id) => setLanguage(id as Language)}
-                />
-              </View>
-
-              <View style={styles.settingRow}>
-                <ThemedText style={styles.switchTitle}>{t('themeLabel')}</ThemedText>
-                <SegmentedControl
-                  options={[
-                    { id: 'light', label: t('themeLight') },
-                    { id: 'dark', label: t('themeDark') },
-                  ]}
-                  value={themeMode}
-                  onChange={(id) => setThemeMode(id as ThemeMode)}
-                />
               </View>
             </View>
-          </View>
 
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t('legalSection')}</ThemedText>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>{t('accountSection')}</ThemedText>
 
-            <View style={[styles.card, styles.legalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <LegalLink label={t('privacyPolicy')} onPress={() => router.push('./privacy')} />
-              <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
-              <LegalLink label={t('termsOfUse')} onPress={() => router.push('./terms')} />
-              <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
-              <LegalLink label={t('support')} onPress={() => router.push('./support')} />
-              {isAdmin && (
-                <>
-                  <View style={[styles.legalDivider, { backgroundColor: theme.backgroundSelected }]} />
-                  <LegalLink label="Admin" onPress={() => router.push('./admin')} />
-                </>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t('securitySection')}</ThemedText>
-
-            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <View style={styles.nameRow}>
-                <ThemedText type="smallBold" themeColor="textSecondary">
-                  {t('newPasswordLabel')}
-                </ThemedText>
-                <View style={styles.nameInputRow}>
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(text) => {
-                      setNewPassword(text);
-                      setPasswordSaved(false);
-                    }}
-                    placeholder={t('newPasswordPlaceholder')}
-                    placeholderTextColor={theme.textSecondary}
-                    secureTextEntry
-                    style={[
-                      styles.input,
-                      styles.nameInput,
-                      { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                    ]}
-                    value={newPassword}
-                  />
-                  <Pressable
-                    disabled={passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH}
-                    onPress={handleChangePassword}
-                    style={[styles.saveButton, { opacity: passwordSaving || newPassword.length < MIN_PASSWORD_LENGTH ? 0.55 : 1 }]}>
-                    <ThemedText style={styles.saveButtonText}>
-                      {passwordSaving ? t('savingLabel') : passwordSaved ? t('savedLabel') : t('saveNameButton')}
-                    </ThemedText>
-                  </Pressable>
-                </View>
+              <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  {t('newPasswordHint')}
+                  {t('deleteAccountDescription')}
                 </ThemedText>
-                {passwordError && <ThemedText style={styles.errorText}>{passwordError}</ThemedText>}
+                <Pressable
+                  disabled={deletingAccount}
+                  onPress={handleDeleteAccount}
+                  style={[styles.deleteAccountButton, deletingAccount && styles.buttonDisabled]}>
+                  <ThemedText style={styles.deleteAccountButtonText}>
+                    {deletingAccount ? t('deletingAccount') : t('deleteAccountButton')}
+                  </ThemedText>
+                </Pressable>
+                {deleteAccountError && <ThemedText style={styles.errorText}>{deleteAccountError}</ThemedText>}
               </View>
             </View>
           </View>
-
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t('accountSection')}</ThemedText>
-
-            <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('deleteAccountDescription')}
-              </ThemedText>
-              <Pressable
-                disabled={deletingAccount}
-                onPress={handleDeleteAccount}
-                style={[styles.deleteAccountButton, deletingAccount && styles.buttonDisabled]}>
-                <ThemedText style={styles.deleteAccountButtonText}>
-                  {deletingAccount ? t('deletingAccount') : t('deleteAccountButton')}
-                </ThemedText>
-              </Pressable>
-              {deleteAccountError && <ThemedText style={styles.errorText}>{deleteAccountError}</ThemedText>}
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
@@ -593,6 +591,9 @@ function SegmentedControl<T extends string>({
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
   },

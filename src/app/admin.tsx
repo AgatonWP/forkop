@@ -1,6 +1,16 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -215,180 +225,185 @@ export default function AdminScreen() {
           <ThemedText themeColor="textSecondary">Du har inte tillgång till den här sidan.</ThemedText>
         </View>
       ) : (
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          style={[styles.scrollView, { backgroundColor: theme.background }]}
-          contentContainerStyle={[
-            styles.contentContainer,
-            { paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four },
-          ]}>
-          <View style={styles.container}>
-            {loading ? (
-              <ActivityIndicator color={theme.textSecondary} />
-            ) : error ? (
-              <ThemedText style={styles.errorText}>{error}</ThemedText>
-            ) : (
-              <>
-                <View style={styles.section}>
-                  <ThemedText style={styles.sectionTitle}>Verifierade arrangörskonton ({organizers.length})</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    Bekräfta alltid via kontaktuppgifterna på arrangörens egen hemsida innan du verifierar, aldrig via
-                    uppgifterna i förfrågan.
-                  </ThemedText>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoider}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            style={[styles.scrollView, { backgroundColor: theme.background }]}
+            contentContainerStyle={[
+              styles.contentContainer,
+              { paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four },
+            ]}>
+            <View style={styles.container}>
+              {loading ? (
+                <ActivityIndicator color={theme.textSecondary} />
+              ) : error ? (
+                <ThemedText style={styles.errorText}>{error}</ThemedText>
+              ) : (
+                <>
+                  <View style={styles.section}>
+                    <ThemedText style={styles.sectionTitle}>Verifierade arrangörskonton ({organizers.length})</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      Bekräfta alltid via kontaktuppgifterna på arrangörens egen hemsida innan du verifierar, aldrig via
+                      uppgifterna i förfrågan.
+                    </ThemedText>
 
-                  <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-                    <TextInput
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      keyboardType="email-address"
-                      onChangeText={(text) => {
-                        setVerifyEmail(text);
-                        setVerifyError(null);
-                      }}
-                      placeholder="Kontots mejladress"
-                      placeholderTextColor={theme.textSecondary}
-                      style={[
-                        styles.input,
-                        { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                      ]}
-                      value={verifyEmail}
-                    />
+                    <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                      <TextInput
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        keyboardType="email-address"
+                        onChangeText={(text) => {
+                          setVerifyEmail(text);
+                          setVerifyError(null);
+                        }}
+                        placeholder="Kontots mejladress"
+                        placeholderTextColor={theme.textSecondary}
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                        ]}
+                        value={verifyEmail}
+                      />
 
-                    <View style={styles.chipRow}>
-                      {VERIFIABLE_ORGANIZERS.map((organizer) => {
-                        const selected = organizer.id === verifyOrganizerId;
-                        return (
-                          <Pressable
-                            key={organizer.id}
-                            onPress={() => setVerifyOrganizerId(organizer.id)}
-                            style={[
-                              styles.chip,
-                              { borderColor: theme.backgroundSelected },
-                              selected && styles.chipSelected,
-                            ]}>
-                            <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
-                              {organizer.name}
-                            </ThemedText>
-                          </Pressable>
-                        );
-                      })}
+                      <View style={styles.chipRow}>
+                        {VERIFIABLE_ORGANIZERS.map((organizer) => {
+                          const selected = organizer.id === verifyOrganizerId;
+                          return (
+                            <Pressable
+                              key={organizer.id}
+                              onPress={() => setVerifyOrganizerId(organizer.id)}
+                              style={[
+                                styles.chip,
+                                { borderColor: theme.backgroundSelected },
+                                selected && styles.chipSelected,
+                              ]}>
+                              <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                                {organizer.name}
+                              </ThemedText>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+
+                      {verifyError && <ThemedText style={styles.errorText}>{verifyError}</ThemedText>}
+
+                      <Pressable
+                        disabled={!canVerify}
+                        onPress={handleVerify}
+                        style={[styles.primaryButton, !canVerify && styles.buttonDisabled]}>
+                        <ThemedText style={styles.primaryButtonText}>{verifying ? 'Verifierar...' : 'Verifiera'}</ThemedText>
+                      </Pressable>
                     </View>
 
-                    {verifyError && <ThemedText style={styles.errorText}>{verifyError}</ThemedText>}
-
-                    <Pressable
-                      disabled={!canVerify}
-                      onPress={handleVerify}
-                      style={[styles.primaryButton, !canVerify && styles.buttonDisabled]}>
-                      <ThemedText style={styles.primaryButtonText}>{verifying ? 'Verifierar...' : 'Verifiera'}</ThemedText>
-                    </Pressable>
+                    {organizers.map((account) => (
+                      <View
+                        key={account.userId}
+                        style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                        <ThemedText style={styles.cardTitle}>{getNation(account.organizerId).name}</ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {account.email} · verifierad {account.verifiedAt.toLocaleDateString('sv-SE')}
+                        </ThemedText>
+                        <Pressable
+                          disabled={busyId === account.userId}
+                          onPress={() => handleRevoke(account)}
+                          style={[styles.destructiveButton, styles.selfEndButton, busyId === account.userId && styles.buttonDisabled]}>
+                          <ThemedText style={styles.destructiveButtonText}>Återkalla</ThemedText>
+                        </Pressable>
+                      </View>
+                    ))}
                   </View>
 
-                  {organizers.map((account) => (
-                    <View
-                      key={account.userId}
-                      style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-                      <ThemedText style={styles.cardTitle}>{getNation(account.organizerId).name}</ThemedText>
+                  <View style={styles.section}>
+                    <ThemedText style={styles.sectionTitle}>Rapporterade annonser ({reports.length})</ThemedText>
+
+                    {reports.length === 0 ? (
                       <ThemedText type="small" themeColor="textSecondary">
-                        {account.email} · verifierad {account.verifiedAt.toLocaleDateString('sv-SE')}
+                        Inga öppna rapporter.
                       </ThemedText>
-                      <Pressable
-                        disabled={busyId === account.userId}
-                        onPress={() => handleRevoke(account)}
-                        style={[styles.destructiveButton, styles.selfEndButton, busyId === account.userId && styles.buttonDisabled]}>
-                        <ThemedText style={styles.destructiveButtonText}>Återkalla</ThemedText>
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-
-                <View style={styles.section}>
-                  <ThemedText style={styles.sectionTitle}>Rapporterade annonser ({reports.length})</ThemedText>
-
-                  {reports.length === 0 ? (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      Inga öppna rapporter.
-                    </ThemedText>
-                  ) : (
-                    reports.map((report) => (
-                      <View
-                        key={report.id}
-                        style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-                        <ThemedText style={styles.cardTitle}>
-                          {report.lostItemId
-                            ? `Borttappat: ${describeLostItemSubject(report.subjectName)}`
-                            : (report.subjectName ?? '(borttagen annons)')}
-                        </ThemedText>
-                        {report.subjectNationId && (
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {getNation(report.subjectNationId).name}
+                    ) : (
+                      reports.map((report) => (
+                        <View
+                          key={report.id}
+                          style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                          <ThemedText style={styles.cardTitle}>
+                            {report.lostItemId
+                              ? `Borttappat: ${describeLostItemSubject(report.subjectName)}`
+                              : (report.subjectName ?? '(borttagen annons)')}
                           </ThemedText>
-                        )}
-                        <ThemedText type="small">Anledning: {report.reason}</ThemedText>
-                        {report.details && (
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {report.details}
-                          </ThemedText>
-                        )}
-                        <View style={styles.rowButtons}>
-                          {report.listingId && (
-                            <Pressable
-                              disabled={busyId === report.listingId}
-                              onPress={() => handleDeleteListing(report.listingId!)}
-                              style={[styles.destructiveButton, busyId === report.listingId && styles.buttonDisabled]}>
-                              <ThemedText style={styles.destructiveButtonText}>Ta bort annons</ThemedText>
-                            </Pressable>
+                          {report.subjectNationId && (
+                            <ThemedText type="small" themeColor="textSecondary">
+                              {getNation(report.subjectNationId).name}
+                            </ThemedText>
                           )}
-                          {report.lostItemId && (
-                            <Pressable
-                              disabled={busyId === report.lostItemId}
-                              onPress={() => handleDeleteLostItem(report.lostItemId!)}
-                              style={[styles.destructiveButton, busyId === report.lostItemId && styles.buttonDisabled]}>
-                              <ThemedText style={styles.destructiveButtonText}>Ta bort anmälan</ThemedText>
-                            </Pressable>
+                          <ThemedText type="small">Anledning: {report.reason}</ThemedText>
+                          {report.details && (
+                            <ThemedText type="small" themeColor="textSecondary">
+                              {report.details}
+                            </ThemedText>
                           )}
-                          <Pressable
-                            disabled={busyId === report.id}
-                            onPress={() => handleDismissReport(report.id)}
-                            style={[styles.secondaryButton, busyId === report.id && styles.buttonDisabled]}>
-                            <ThemedText style={styles.secondaryButtonText}>Avfärda rapport</ThemedText>
-                          </Pressable>
+                          <View style={styles.rowButtons}>
+                            {report.listingId && (
+                              <Pressable
+                                disabled={busyId === report.listingId}
+                                onPress={() => handleDeleteListing(report.listingId!)}
+                                style={[styles.destructiveButton, busyId === report.listingId && styles.buttonDisabled]}>
+                                <ThemedText style={styles.destructiveButtonText}>Ta bort annons</ThemedText>
+                              </Pressable>
+                            )}
+                            {report.lostItemId && (
+                              <Pressable
+                                disabled={busyId === report.lostItemId}
+                                onPress={() => handleDeleteLostItem(report.lostItemId!)}
+                                style={[styles.destructiveButton, busyId === report.lostItemId && styles.buttonDisabled]}>
+                                <ThemedText style={styles.destructiveButtonText}>Ta bort anmälan</ThemedText>
+                              </Pressable>
+                            )}
+                            <Pressable
+                              disabled={busyId === report.id}
+                              onPress={() => handleDismissReport(report.id)}
+                              style={[styles.secondaryButton, busyId === report.id && styles.buttonDisabled]}>
+                              <ThemedText style={styles.secondaryButtonText}>Avfärda rapport</ThemedText>
+                            </Pressable>
+                          </View>
                         </View>
+                      ))
+                    )}
+                  </View>
+
+                  <View style={styles.section}>
+                    <ThemedText style={styles.sectionTitle}>Alla annonser ({listings.length})</ThemedText>
+
+                    {listings.map((listing) => (
+                      <View
+                        key={listing.id}
+                        style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                        <ThemedText style={styles.cardTitle}>{listing.eventName}</ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {getListingOrganizerName(listing)} · {listing.ticketType} · {listing.isSold ? 'Såld' : 'Aktiv'}
+                        </ThemedText>
+                        <Pressable
+                          disabled={busyId === listing.id}
+                          onPress={() => handleDeleteListing(listing.id)}
+                          style={[styles.destructiveButton, styles.selfEndButton, busyId === listing.id && styles.buttonDisabled]}>
+                          <ThemedText style={styles.destructiveButtonText}>Ta bort</ThemedText>
+                        </Pressable>
                       </View>
-                    ))
-                  )}
-                </View>
-
-                <View style={styles.section}>
-                  <ThemedText style={styles.sectionTitle}>Alla annonser ({listings.length})</ThemedText>
-
-                  {listings.map((listing) => (
-                    <View
-                      key={listing.id}
-                      style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-                      <ThemedText style={styles.cardTitle}>{listing.eventName}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {getListingOrganizerName(listing)} · {listing.ticketType} · {listing.isSold ? 'Såld' : 'Aktiv'}
-                      </ThemedText>
-                      <Pressable
-                        disabled={busyId === listing.id}
-                        onPress={() => handleDeleteListing(listing.id)}
-                        style={[styles.destructiveButton, styles.selfEndButton, busyId === listing.id && styles.buttonDisabled]}>
-                        <ThemedText style={styles.destructiveButtonText}>Ta bort</ThemedText>
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              </>
-            )}
-          </View>
-        </ScrollView>
+                    ))}
+                  </View>
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
   },

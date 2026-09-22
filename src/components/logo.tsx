@@ -14,6 +14,12 @@ const DOT_GAP = FONT_SIZE * 0.05;
 // above the first Ö: dots below a round letter read tighter than dots above
 // one, and at that spacing they looked stuck to it on a phone.
 const DOT_DROP = FONT_SIZE * 0.12;
+// Poppins has no kerning pair for K–O, and with the word split into pieces to
+// draw the dots, nothing tightens it either. Measured row by row, K and O came
+// no closer than 3.8 pt while every other pair in the word sits at 1.4 pt, with
+// a 6 pt pocket of air at mid-height. Pulling the O in by 2 pt brings the pair
+// into the same rhythm; P follows along, so O–P is unchanged.
+const KO_KERN = -FONT_SIZE * 0.1;
 
 export function Logo() {
   const theme = useTheme();
@@ -66,6 +72,7 @@ const styles = StyleSheet.create({
   },
   underdotO: {
     alignItems: 'center',
+    marginLeft: KO_KERN,
   },
   dots: {
     bottom: DOT_DROP,

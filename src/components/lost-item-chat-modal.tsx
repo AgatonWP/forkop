@@ -4,9 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -15,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ReportModal } from '@/components/report-modal';
+import { SheetKeyboardAvoider } from '@/components/sheet-keyboard-avoider';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -239,10 +238,7 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
           )}
         </View>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Spacing.three}
-          style={styles.body}>
+        <SheetKeyboardAvoider style={styles.body}>
           {loading ? (
             <View style={styles.center}>
               <ActivityIndicator color={theme.textSecondary} size="small" />
@@ -331,7 +327,7 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
               </Pressable>
             </View>
           )}
-        </KeyboardAvoidingView>
+        </SheetKeyboardAvoider>
 
         <ReportModal
           visible={reportOpen}

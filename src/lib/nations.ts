@@ -41,7 +41,9 @@ export const NATIONS_LIST: Nation[] = [
 
 // Keep all known organizers available for existing listings and search, while
 // only exposing currently active choices when a user creates a listing.
-export const SELECTABLE_NATIONS_LIST = NATIONS_LIST.filter(({ id }) => id !== 'karneval');
+// Lundakarnevalen was left out here, which pushed its sellers to type it in
+// under "Annat" and lose both the organizer filter and its own ticket types.
+export const SELECTABLE_NATIONS_LIST = NATIONS_LIST;
 
 export function normalizeSearchText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');

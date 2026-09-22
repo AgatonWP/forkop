@@ -4,7 +4,18 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, LayoutAnimation, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NationEmblem } from '@/components/nation-emblem';
@@ -383,313 +394,273 @@ export default function ProfileScreen() {
         </View>
       </SafeAreaView>
 
-      <ScrollView
-        style={[styles.scrollView, { backgroundColor: theme.background }]}
-        contentContainerStyle={[
-          styles.contentContainer,
-          {
-            paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four,
-          },
-        ]}>
-        <View style={styles.container}>
-          {initializing ? (
-            <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <ActivityIndicator size="small" color={theme.textSecondary} />
-            </View>
-          ) : user ? (
-            <>
-              <View style={styles.profileRow}>
-                {user.user_metadata?.avatar_url ? (
-                  <Image
-                    contentFit="cover"
-                    source={{ uri: user.user_metadata.avatar_url }}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={styles.avatar}>
-                    <ThemedText style={styles.avatarText}>
-                      {(user.email?.[0] ?? 'T').toUpperCase()}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoider}>
+        <ScrollView
+          style={[styles.scrollView, { backgroundColor: theme.background }]}
+          contentContainerStyle={[
+            styles.contentContainer,
+            {
+              paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.four,
+            },
+          ]}>
+          <View style={styles.container}>
+            {initializing ? (
+              <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <ActivityIndicator size="small" color={theme.textSecondary} />
+              </View>
+            ) : user ? (
+              <>
+                <View style={styles.profileRow}>
+                  {user.user_metadata?.avatar_url ? (
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: user.user_metadata.avatar_url }}
+                      style={styles.avatar}
+                    />
+                  ) : (
+                    <View style={styles.avatar}>
+                      <ThemedText style={styles.avatarText}>
+                        {(user.email?.[0] ?? 'T').toUpperCase()}
+                      </ThemedText>
+                    </View>
+                  )}
+                  <View style={styles.profileCopy}>
+                    <View style={styles.profileNameRow}>
+                      <ThemedText numberOfLines={1} style={styles.profileName}>
+                        {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Förköp'}
+                      </ThemedText>
+                      {ownRatingSummary && (
+                        <View style={styles.ownRatingBadge}>
+                          <ThemedText
+                            style={[
+                              styles.ownRatingEmoji,
+                              { transform: [{ rotate: `${-(5 - Math.round(ownRatingSummary.average)) * 45}deg` }] },
+                            ]}>
+                            👍
+                          </ThemedText>
+                          <ThemedText style={styles.ownRatingCount}>({ownRatingSummary.count})</ThemedText>
+                        </View>
+                      )}
+                    </View>
+                    <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
+                      {user.email}
                     </ThemedText>
-                  </View>
-                )}
-                <View style={styles.profileCopy}>
-                  <View style={styles.profileNameRow}>
-                    <ThemedText numberOfLines={1} style={styles.profileName}>
-                      {user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Förköp'}
-                    </ThemedText>
-                    {ownRatingSummary && (
-                      <View style={styles.ownRatingBadge}>
-                        <ThemedText
-                          style={[
-                            styles.ownRatingEmoji,
-                            { transform: [{ rotate: `${-(5 - Math.round(ownRatingSummary.average)) * 45}deg` }] },
-                          ]}>
-                          👍
-                        </ThemedText>
-                        <ThemedText style={styles.ownRatingCount}>({ownRatingSummary.count})</ThemedText>
-                      </View>
+                    {verifiedOrganizerId && (
+                      <VerifiedOrganizerBadge
+                        organizerName={getNation(verifiedOrganizerId).name}
+                        style={styles.profileVerifiedBadge}
+                      />
                     )}
                   </View>
-                  <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-                    {user.email}
-                  </ThemedText>
-                  {verifiedOrganizerId && (
-                    <VerifiedOrganizerBadge
-                      organizerName={getNation(verifiedOrganizerId).name}
-                      style={styles.profileVerifiedBadge}
-                    />
-                  )}
+                  <Pressable
+                    disabled={submitting}
+                    onPress={handleSignOut}
+                    style={[styles.outlineButton, { borderColor: theme.backgroundSelected, opacity: submitting ? 0.6 : 1 }]}>
+                    <ThemedText style={styles.outlineButtonText}>{t('signOut')}</ThemedText>
+                  </Pressable>
                 </View>
+
+                {/* Watches used to live in Settings, where nobody found them. */}
                 <Pressable
-                  disabled={submitting}
-                  onPress={handleSignOut}
-                  style={[styles.outlineButton, { borderColor: theme.backgroundSelected, opacity: submitting ? 0.6 : 1 }]}>
-                  <ThemedText style={styles.outlineButtonText}>{t('signOut')}</ThemedText>
-                </Pressable>
-              </View>
-
-              {/* Watches used to live in Settings, where nobody found them. */}
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/watches')}
-                style={({ pressed }) => [
-                  styles.watchesRow,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.backgroundSelected,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}>
-                <View style={[styles.watchesIcon, { backgroundColor: theme.backgroundSelected }]}>
-                  <Ionicons color={theme.text} name="notifications-outline" size={18} />
-                </View>
-                <View style={styles.watchesCopy}>
-                  <ThemedText style={styles.watchesTitle}>
-                    {watches.length > 0 ? `${t('watchesTitle')} (${watches.length})` : t('watchesTitle')}
-                  </ThemedText>
-                  <ThemedText numberOfLines={2} type="small" themeColor="textSecondary">
-                    {t('watchesLinkCopy')}
-                  </ThemedText>
-                </View>
-                <ThemedText style={styles.watchesChevron} themeColor="textSecondary">
-                  ›
-                </ThemedText>
-              </Pressable>
-
-              <ProfileSection title={t('activeListings')} count={activeListings.length}>
-                {listingsLoading ? (
-                  <SectionNotice text={t('loadingListings')} loading />
-                ) : activeListings.length > 0 ? (
-                  activeListings.map((listing) => (
-                    <ListingRow
-                      key={listing.id}
-                      listing={listing}
-                      pending={pendingListingId === listing.id}
-                      onDelete={() => setDeleteCandidate(listing)}
-                    />
-                  ))
-                ) : (
-                  <SectionNotice text={t('noActiveListings')} />
-                )}
-
-                {/* Posting left the tab bar, so the place you manage your
-                    listings is the second way in, next to the + on Hitta. */}
-                <Pressable
-                  onPress={() => router.push('/sell')}
+                  accessibilityRole="button"
+                  onPress={() => router.push('/watches')}
                   style={({ pressed }) => [
-                    styles.noticeRow,
+                    styles.watchesRow,
                     {
                       backgroundColor: theme.backgroundElement,
                       borderColor: theme.backgroundSelected,
                       opacity: pressed ? 0.7 : 1,
                     },
                   ]}>
-                  <Ionicons color={theme.text} name="add" size={18} />
-                  <ThemedText type="smallBold">{t('postListing')}</ThemedText>
+                  <View style={[styles.watchesIcon, { backgroundColor: theme.backgroundSelected }]}>
+                    <Ionicons color={theme.text} name="notifications-outline" size={18} />
+                  </View>
+                  <View style={styles.watchesCopy}>
+                    <ThemedText style={styles.watchesTitle}>
+                      {watches.length > 0 ? `${t('watchesTitle')} (${watches.length})` : t('watchesTitle')}
+                    </ThemedText>
+                    <ThemedText numberOfLines={2} type="small" themeColor="textSecondary">
+                      {t('watchesLinkCopy')}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.watchesChevron} themeColor="textSecondary">
+                    ›
+                  </ThemedText>
                 </Pressable>
-              </ProfileSection>
 
-              <ProfileSection title={t('soldListings')} count={soldListings.length}>
-                {listingsLoading ? (
-                  <SectionNotice text={t('loadingListings')} loading />
-                ) : soldListings.length > 0 ? (
-                  soldListings.map((listing) => (
-                    <ListingRow
-                      key={listing.id}
-                      listing={listing}
-                      pending={pendingListingId === listing.id}
-                      sold
-                      rating={ownRatings.get(listing.id)}
-                      onDelete={() => setDeleteCandidate(listing)}
-                      onRate={() => setRatingListing(listing)}
-                    />
-                  ))
-                ) : (
-                  <SectionNotice text={t('noSoldListings')} />
-                )}
-              </ProfileSection>
-
-              {listingsError && <ThemedText style={styles.errorText}>{listingsError}</ThemedText>}
-            </>
-          ) : (
-            <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-              <View style={styles.authHeader}>
-                <ThemedText style={styles.authTitle}>
-                  {mode === 'signin' ? t('signIn') : mode === 'signup' ? t('signUp') : t('resetPasswordTitle')}
-                </ThemedText>
-                {mode !== 'forgot' && (
-                  <Pressable
-                    onPress={() => {
-                      setMode(mode === 'signin' ? 'signup' : 'signin');
-                      setAuthError(null);
-                      setConfirmationEmailSent(false);
-                      setSignupFullName('');
-                      setSignupSwishNumber('');
-                      setPasswordRepeat('');
-                      setPasswordVisible(false);
-                    }}>
-                    <ThemedText style={styles.authSwitch}>
-                      {mode === 'signin' ? t('signUp') : t('signIn')}
-                    </ThemedText>
-                  </Pressable>
-                )}
-              </View>
-
-              {mode === 'signin' && justConfirmed && (
-                <ThemedText type="small" style={styles.confirmationNotice}>
-                  {t('accountConfirmedNotice')}
-                </ThemedText>
-              )}
-
-              {confirmationEmailSent && (
-                <ThemedText type="small" style={styles.confirmationNotice}>
-                  {t('confirmEmailNotice')}
-                </ThemedText>
-              )}
-
-              {mode === 'forgot' ? (
-                <>
-                  {resetEmailSent ? (
-                    <ThemedText type="small" style={styles.confirmationNotice}>
-                      {t('resetLinkSentNotice')}
-                    </ThemedText>
+                <ProfileSection title={t('activeListings')} count={activeListings.length}>
+                  {listingsLoading ? (
+                    <SectionNotice text={t('loadingListings')} loading />
+                  ) : activeListings.length > 0 ? (
+                    activeListings.map((listing) => (
+                      <ListingRow
+                        key={listing.id}
+                        listing={listing}
+                        pending={pendingListingId === listing.id}
+                        onDelete={() => setDeleteCandidate(listing)}
+                      />
+                    ))
                   ) : (
-                    <>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {t('resetPasswordInstructions')}
-                      </ThemedText>
-                      <TextInput
-                        autoCapitalize="none"
-                        autoComplete="email"
-                        keyboardType="email-address"
-                        onChangeText={setEmail}
-                        placeholder="Email"
-                        placeholderTextColor={theme.textSecondary}
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: theme.background,
-                            borderColor: theme.backgroundSelected,
-                            color: theme.text,
-                          },
-                        ]}
-                        value={email}
-                      />
-
-                      {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
-
-                      <Pressable
-                        disabled={submitting || !email.trim()}
-                        onPress={handleForgotPassword}
-                        style={[
-                          styles.primaryButton,
-                          { opacity: submitting || !email.trim() ? 0.55 : 1 },
-                        ]}>
-                        <ThemedText style={styles.primaryButtonText}>
-                          {submitting ? t('wait') : t('sendResetLink')}
-                        </ThemedText>
-                      </Pressable>
-                    </>
+                    <SectionNotice text={t('noActiveListings')} />
                   )}
 
+                  {/* Posting left the tab bar, so the place you manage your
+                      listings is the second way in, next to the + on Hitta. */}
                   <Pressable
-                    onPress={() => {
-                      setMode('signin');
-                      setAuthError(null);
-                      setResetEmailSent(false);
-                    }}>
-                    <ThemedText style={styles.authSwitch}>{t('backToSignIn')}</ThemedText>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <TextInput
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    keyboardType="email-address"
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      setConfirmationEmailSent(false);
-                    }}
-                    placeholder="Email"
-                    placeholderTextColor={theme.textSecondary}
-                    style={[
-                      styles.input,
+                    onPress={() => router.push('/sell')}
+                    style={({ pressed }) => [
+                      styles.noticeRow,
                       {
-                        backgroundColor: theme.background,
+                        backgroundColor: theme.backgroundElement,
                         borderColor: theme.backgroundSelected,
-                        color: theme.text,
+                        opacity: pressed ? 0.7 : 1,
                       },
-                    ]}
-                    value={email}
-                  />
-                  {passwordFieldVisible && (
-                    <View style={styles.passwordField}>
-                      <TextInput
-                        autoCapitalize="none"
-                        onChangeText={setPassword}
-                        placeholder={mode === 'signup' ? t('passwordSignupPlaceholder') : t('password')}
-                        placeholderTextColor={theme.textSecondary}
-                        secureTextEntry={!passwordVisible}
-                        style={[
-                          styles.input,
-                          styles.passwordInput,
-                          {
-                            backgroundColor: theme.background,
-                            borderColor: theme.backgroundSelected,
-                            color: theme.text,
-                          },
-                        ]}
-                        value={password}
+                    ]}>
+                    <Ionicons color={theme.text} name="add" size={18} />
+                    <ThemedText type="smallBold">{t('postListing')}</ThemedText>
+                  </Pressable>
+                </ProfileSection>
+
+                <ProfileSection title={t('soldListings')} count={soldListings.length}>
+                  {listingsLoading ? (
+                    <SectionNotice text={t('loadingListings')} loading />
+                  ) : soldListings.length > 0 ? (
+                    soldListings.map((listing) => (
+                      <ListingRow
+                        key={listing.id}
+                        listing={listing}
+                        pending={pendingListingId === listing.id}
+                        sold
+                        rating={ownRatings.get(listing.id)}
+                        onDelete={() => setDeleteCandidate(listing)}
+                        onRate={() => setRatingListing(listing)}
                       />
-                      <Pressable
-                        accessibilityLabel={t(passwordVisible ? 'hidePassword' : 'showPassword')}
-                        accessibilityRole="button"
-                        hitSlop={8}
-                        onPress={() => setPasswordVisible((visible) => !visible)}
-                        style={styles.passwordToggle}>
-                        <Ionicons
-                          color={theme.textSecondary}
-                          name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
-                          size={20}
+                    ))
+                  ) : (
+                    <SectionNotice text={t('noSoldListings')} />
+                  )}
+                </ProfileSection>
+
+                {listingsError && <ThemedText style={styles.errorText}>{listingsError}</ThemedText>}
+              </>
+            ) : (
+              <View style={[styles.authPanel, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                <View style={styles.authHeader}>
+                  <ThemedText style={styles.authTitle}>
+                    {mode === 'signin' ? t('signIn') : mode === 'signup' ? t('signUp') : t('resetPasswordTitle')}
+                  </ThemedText>
+                  {mode !== 'forgot' && (
+                    <Pressable
+                      onPress={() => {
+                        setMode(mode === 'signin' ? 'signup' : 'signin');
+                        setAuthError(null);
+                        setConfirmationEmailSent(false);
+                        setSignupFullName('');
+                        setSignupSwishNumber('');
+                        setPasswordRepeat('');
+                        setPasswordVisible(false);
+                      }}>
+                      <ThemedText style={styles.authSwitch}>
+                        {mode === 'signin' ? t('signUp') : t('signIn')}
+                      </ThemedText>
+                    </Pressable>
+                  )}
+                </View>
+
+                {mode === 'signin' && justConfirmed && (
+                  <ThemedText type="small" style={styles.confirmationNotice}>
+                    {t('accountConfirmedNotice')}
+                  </ThemedText>
+                )}
+
+                {confirmationEmailSent && (
+                  <ThemedText type="small" style={styles.confirmationNotice}>
+                    {t('confirmEmailNotice')}
+                  </ThemedText>
+                )}
+
+                {mode === 'forgot' ? (
+                  <>
+                    {resetEmailSent ? (
+                      <ThemedText type="small" style={styles.confirmationNotice}>
+                        {t('resetLinkSentNotice')}
+                      </ThemedText>
+                    ) : (
+                      <>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {t('resetPasswordInstructions')}
+                        </ThemedText>
+                        <TextInput
+                          autoCapitalize="none"
+                          autoComplete="email"
+                          keyboardType="email-address"
+                          onChangeText={setEmail}
+                          placeholder="Email"
+                          placeholderTextColor={theme.textSecondary}
+                          style={[
+                            styles.input,
+                            {
+                              backgroundColor: theme.background,
+                              borderColor: theme.backgroundSelected,
+                              color: theme.text,
+                            },
+                          ]}
+                          value={email}
                         />
-                      </Pressable>
-                    </View>
-                  )}
 
-                  {passwordTooShort && password.length > 0 && (
-                    <ThemedText type="small" style={styles.fieldHint}>
-                      {t('passwordMinHint')}
-                    </ThemedText>
-                  )}
+                        {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
 
-                  {signupExpanded && password.length > 0 && (
-                    <>
+                        <Pressable
+                          disabled={submitting || !email.trim()}
+                          onPress={handleForgotPassword}
+                          style={[
+                            styles.primaryButton,
+                            { opacity: submitting || !email.trim() ? 0.55 : 1 },
+                          ]}>
+                          <ThemedText style={styles.primaryButtonText}>
+                            {submitting ? t('wait') : t('sendResetLink')}
+                          </ThemedText>
+                        </Pressable>
+                      </>
+                    )}
+
+                    <Pressable
+                      onPress={() => {
+                        setMode('signin');
+                        setAuthError(null);
+                        setResetEmailSent(false);
+                      }}>
+                      <ThemedText style={styles.authSwitch}>{t('backToSignIn')}</ThemedText>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <TextInput
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      keyboardType="email-address"
+                      onChangeText={(text) => {
+                        setEmail(text);
+                        setConfirmationEmailSent(false);
+                      }}
+                      placeholder="Email"
+                      placeholderTextColor={theme.textSecondary}
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.background,
+                          borderColor: theme.backgroundSelected,
+                          color: theme.text,
+                        },
+                      ]}
+                      value={email}
+                    />
+                    {passwordFieldVisible && (
                       <View style={styles.passwordField}>
                         <TextInput
                           autoCapitalize="none"
-                          onChangeText={setPasswordRepeat}
-                          placeholder={t('repeatPasswordPlaceholder')}
+                          onChangeText={setPassword}
+                          placeholder={mode === 'signup' ? t('passwordSignupPlaceholder') : t('password')}
                           placeholderTextColor={theme.textSecondary}
                           secureTextEntry={!passwordVisible}
                           style={[
@@ -697,139 +668,181 @@ export default function ProfileScreen() {
                             styles.passwordInput,
                             {
                               backgroundColor: theme.background,
-                              borderColor: passwordsMatch ? '#3F9A6A' : theme.backgroundSelected,
+                              borderColor: theme.backgroundSelected,
                               color: theme.text,
                             },
                           ]}
-                          value={passwordRepeat}
+                          value={password}
                         />
-                        {passwordsMatch && (
-                          <View style={styles.passwordToggle}>
-                            <Ionicons color="#3F9A6A" name="checkmark-circle" size={20} />
-                          </View>
-                        )}
+                        <Pressable
+                          accessibilityLabel={t(passwordVisible ? 'hidePassword' : 'showPassword')}
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => setPasswordVisible((visible) => !visible)}
+                          style={styles.passwordToggle}>
+                          <Ionicons
+                            color={theme.textSecondary}
+                            name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                            size={20}
+                          />
+                        </Pressable>
                       </View>
+                    )}
 
-                      {passwordsDiverged && (
-                        <ThemedText type="small" style={styles.fieldHint}>
-                          {t('passwordsDoNotMatch')}
-                        </ThemedText>
-                      )}
-                    </>
-                  )}
-
-                  {mode === 'signin' && (
-                    <Pressable
-                      onPress={() => {
-                        setMode('forgot');
-                        setAuthError(null);
-                        setResetEmailSent(false);
-                      }}
-                      style={styles.forgotPasswordLink}>
-                      <ThemedText style={styles.authSwitch}>{t('forgotPassword')}</ThemedText>
-                    </Pressable>
-                  )}
-
-                  {signupExpanded && (
-                    <>
-                      <TextInput
-                        maxLength={MAX_DISPLAY_NAME_LENGTH}
-                        onChangeText={(text) => setSignupFullName(text.replace(/[^\p{L}\s]/gu, ''))}
-                        placeholder={t('displayNameOptionalPlaceholder')}
-                        placeholderTextColor={theme.textSecondary}
-                        style={[
-                          styles.input,
-                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                        ]}
-                        value={signupFullName}
-                      />
-                      <TextInput
-                        keyboardType="phone-pad"
-                        onChangeText={(text) => {
-                          const cleaned = text.replace(/[^\d\s+-]/g, '');
-                          // Stop at 15 digits rather than letting a typo run on:
-                          // no phone number anywhere is longer than that.
-                          if (countSwishDigits(cleaned) <= MAX_SWISH_DIGITS) {
-                            setSignupSwishNumber(cleaned);
-                          }
-                        }}
-                        placeholder={t('swishNumberOptionalPlaceholder')}
-                        placeholderTextColor={theme.textSecondary}
-                        style={[
-                          styles.input,
-                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
-                        ]}
-                        value={signupSwishNumber}
-                      />
-
-                      {swishNumberInvalid && (
-                        <ThemedText type="small" style={styles.fieldHint}>
-                          {t('swishNumberLengthHint')}
-                        </ThemedText>
-                      )}
-                    </>
-                  )}
-
-                  {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
-
-                  <Pressable
-                    disabled={!canSubmitAuth}
-                    onPress={handleAuthSubmit}
-                    style={[styles.primaryButton, { opacity: canSubmitAuth ? 1 : 0.55 }]}>
-                    <ThemedText style={styles.primaryButtonText}>
-                      {submitting ? t('wait') : mode === 'signin' ? t('signIn') : t('signUp')}
-                    </ThemedText>
-                  </Pressable>
-
-                  {Platform.OS === 'ios' && (
-                    <>
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.authDivider}>
-                        {t('orDivider')}
+                    {passwordTooShort && password.length > 0 && (
+                      <ThemedText type="small" style={styles.fieldHint}>
+                        {t('passwordMinHint')}
                       </ThemedText>
-                      <AppleAuthentication.AppleAuthenticationButton
-                        buttonType={
-                          mode === 'signup'
-                            ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
-                            : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                        }
-                        buttonStyle={
-                          themeMode === 'dark'
-                            ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                            : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                        }
-                        cornerRadius={8}
-                        onPress={handleAppleSignIn}
-                        style={styles.appleButton}
-                      />
+                    )}
+
+                    {signupExpanded && password.length > 0 && (
+                      <>
+                        <View style={styles.passwordField}>
+                          <TextInput
+                            autoCapitalize="none"
+                            onChangeText={setPasswordRepeat}
+                            placeholder={t('repeatPasswordPlaceholder')}
+                            placeholderTextColor={theme.textSecondary}
+                            secureTextEntry={!passwordVisible}
+                            style={[
+                              styles.input,
+                              styles.passwordInput,
+                              {
+                                backgroundColor: theme.background,
+                                borderColor: passwordsMatch ? '#3F9A6A' : theme.backgroundSelected,
+                                color: theme.text,
+                              },
+                            ]}
+                            value={passwordRepeat}
+                          />
+                          {passwordsMatch && (
+                            <View style={styles.passwordToggle}>
+                              <Ionicons color="#3F9A6A" name="checkmark-circle" size={20} />
+                            </View>
+                          )}
+                        </View>
+
+                        {passwordsDiverged && (
+                          <ThemedText type="small" style={styles.fieldHint}>
+                            {t('passwordsDoNotMatch')}
+                          </ThemedText>
+                        )}
+                      </>
+                    )}
+
+                    {mode === 'signin' && (
                       <Pressable
-                        disabled={submitting}
-                        onPress={handleGoogleSignIn}
-                        style={({ pressed }) => [
-                          styles.googleButton,
-                          {
-                            // Google's white button carries a border so it reads as a
-                            // button on light backgrounds; on dark it stands on its own.
-                            borderColor: themeMode === 'dark' ? '#FFFFFF' : '#747775',
-                            opacity: pressed || submitting ? 0.7 : 1,
-                          },
-                        ]}>
-                        <Image
-                          contentFit="contain"
-                          source={require('@/assets/images/google-g.png')}
-                          style={styles.googleLogo}
-                        />
-                        <ThemedText style={styles.googleButtonText}>
-                          {mode === 'signup' ? t('signUpWithGoogle') : t('signInWithGoogle')}
-                        </ThemedText>
+                        onPress={() => {
+                          setMode('forgot');
+                          setAuthError(null);
+                          setResetEmailSent(false);
+                        }}
+                        style={styles.forgotPasswordLink}>
+                        <ThemedText style={styles.authSwitch}>{t('forgotPassword')}</ThemedText>
                       </Pressable>
-                    </>
-                  )}
-                </>
-              )}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+                    )}
+
+                    {signupExpanded && (
+                      <>
+                        <TextInput
+                          maxLength={MAX_DISPLAY_NAME_LENGTH}
+                          onChangeText={(text) => setSignupFullName(text.replace(/[^\p{L}\s]/gu, ''))}
+                          placeholder={t('displayNameOptionalPlaceholder')}
+                          placeholderTextColor={theme.textSecondary}
+                          style={[
+                            styles.input,
+                            { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                          ]}
+                          value={signupFullName}
+                        />
+                        <TextInput
+                          keyboardType="phone-pad"
+                          onChangeText={(text) => {
+                            const cleaned = text.replace(/[^\d\s+-]/g, '');
+                            // Stop at 15 digits rather than letting a typo run on:
+                            // no phone number anywhere is longer than that.
+                            if (countSwishDigits(cleaned) <= MAX_SWISH_DIGITS) {
+                              setSignupSwishNumber(cleaned);
+                            }
+                          }}
+                          placeholder={t('swishNumberOptionalPlaceholder')}
+                          placeholderTextColor={theme.textSecondary}
+                          style={[
+                            styles.input,
+                            { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                          ]}
+                          value={signupSwishNumber}
+                        />
+
+                        {swishNumberInvalid && (
+                          <ThemedText type="small" style={styles.fieldHint}>
+                            {t('swishNumberLengthHint')}
+                          </ThemedText>
+                        )}
+                      </>
+                    )}
+
+                    {authError && <ThemedText style={styles.errorText}>{authError}</ThemedText>}
+
+                    <Pressable
+                      disabled={!canSubmitAuth}
+                      onPress={handleAuthSubmit}
+                      style={[styles.primaryButton, { opacity: canSubmitAuth ? 1 : 0.55 }]}>
+                      <ThemedText style={styles.primaryButtonText}>
+                        {submitting ? t('wait') : mode === 'signin' ? t('signIn') : t('signUp')}
+                      </ThemedText>
+                    </Pressable>
+
+                    {Platform.OS === 'ios' && (
+                      <>
+                        <ThemedText type="small" themeColor="textSecondary" style={styles.authDivider}>
+                          {t('orDivider')}
+                        </ThemedText>
+                        <AppleAuthentication.AppleAuthenticationButton
+                          buttonType={
+                            mode === 'signup'
+                              ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                              : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                          }
+                          buttonStyle={
+                            themeMode === 'dark'
+                              ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                              : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                          }
+                          cornerRadius={8}
+                          onPress={handleAppleSignIn}
+                          style={styles.appleButton}
+                        />
+                        <Pressable
+                          disabled={submitting}
+                          onPress={handleGoogleSignIn}
+                          style={({ pressed }) => [
+                            styles.googleButton,
+                            {
+                              // Google's white button carries a border so it reads as a
+                              // button on light backgrounds; on dark it stands on its own.
+                              borderColor: themeMode === 'dark' ? '#FFFFFF' : '#747775',
+                              opacity: pressed || submitting ? 0.7 : 1,
+                            },
+                          ]}>
+                          <Image
+                            contentFit="contain"
+                            source={require('@/assets/images/google-g.png')}
+                            style={styles.googleLogo}
+                          />
+                          <ThemedText style={styles.googleButtonText}>
+                            {mode === 'signup' ? t('signUpWithGoogle') : t('signInWithGoogle')}
+                          </ThemedText>
+                        </Pressable>
+                      </>
+                    )}
+                  </>
+                )}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <ListingActionModal
         listing={deleteCandidate}
@@ -1063,6 +1076,9 @@ function ListingActionModal({
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
   },

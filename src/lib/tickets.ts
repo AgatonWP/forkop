@@ -63,6 +63,31 @@ export type Listing = {
   sellerAvatarUrl?: string;
 };
 
+/** Ticket types every organizer sells. The form adds the free-text 'Annan' last. */
+export const BASE_TICKET_TYPES = ['Förköp', 'Eftersläpp'];
+
+/**
+ * Types particular to one organizer, offered first once it is picked.
+ * Lundakarnevalen's Efterkarnevalen was being posted as "Förköp" with its real
+ * name buried in the description, where neither the ticket filter nor search
+ * could reach it. Add an organizer here when it sells something the two base
+ * types do not describe.
+ */
+const ORGANIZER_TICKET_TYPES: Record<string, string[]> = {
+  karneval: ['Efterkarnevalen'],
+};
+
+export function ticketTypesFor(organizerId: string | null | undefined): string[] {
+  const special = organizerId ? (ORGANIZER_TICKET_TYPES[organizerId] ?? []) : [];
+  return [...special, ...BASE_TICKET_TYPES];
+}
+
+/** Every ticket type the feed's filter offers. */
+export const FILTERABLE_TICKET_TYPES = [
+  ...BASE_TICKET_TYPES,
+  ...Object.values(ORGANIZER_TICKET_TYPES).flat(),
+];
+
 export const MAX_EXACT_TICKET_QUANTITY = 20;
 export const MORE_THAN_MAX_TICKET_QUANTITY = MAX_EXACT_TICKET_QUANTITY + 1;
 

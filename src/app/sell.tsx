@@ -27,6 +27,7 @@ import { SELECTABLE_NATIONS_LIST, getNation } from '@/lib/nations';
 import {
   DealType,
   ListingDirection,
+  ticketTypesFor,
   MORE_THAN_MAX_TICKET_QUANTITY,
   describeListingError,
   formatListingEventDate,
@@ -34,7 +35,7 @@ import {
   toLocalDateId,
 } from '@/lib/tickets';
 
-const TICKET_TYPES = ['Förköp', 'Eftersläpp', 'Annan'];
+const OTHER_TICKET_TYPE = 'Annan';
 const QUANTITY_OPTIONS = Array.from({ length: MORE_THAN_MAX_TICKET_QUANTITY }, (_, index) => {
   const quantity = index + 1;
   return {
@@ -47,6 +48,19 @@ const MAX_ORGANIZER_LENGTH = 40;
 const MAX_CUSTOM_TICKET_TYPE_LENGTH = 30;
 const MAX_DESCRIPTION_LENGTH = 1000;
 const DATE_OPTION_DAYS = 180;
+
+/**
+ * Picking an organizer with its own ticket types preselects the first of them —
+ * whoever picks Lundakarnevalen is almost certainly selling Efterkarnevalen —
+ * and moving away from it drops a type the new organizer does not have. A
+ * free-text "Annan" is always kept.
+ */
+function ticketTypeAfterOrganizerChange(current: string, organizerId: string) {
+  const options = ticketTypesFor(organizerId);
+  if (current === OTHER_TICKET_TYPE) return current;
+  if (options[0] !== ticketTypesFor(null)[0]) return options[0];
+  return options.includes(current) ? current : options[0];
+}
 
 export default function SellScreen() {
   const theme = useTheme();
@@ -64,7 +78,7 @@ export default function SellScreen() {
 
   const [nationId, setNationId] = useState('');
   const [customOrganizer, setCustomOrganizer] = useState('');
-  const [ticketType, setTicketType] = useState(TICKET_TYPES[0]);
+  const [ticketType, setTicketType] = useState(ticketTypesFor(null)[0]);
   const [customTicketType, setCustomTicketType] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -72,7 +86,7 @@ export default function SellScreen() {
   const [price, setPrice] = useState('');
   const [wantedNationId, setWantedNationId] = useState('');
   const [wantedCustomOrganizer, setWantedCustomOrganizer] = useState('');
-  const [wantedTicketType, setWantedTicketType] = useState(TICKET_TYPES[0]);
+  const [wantedTicketType, setWantedTicketType] = useState(ticketTypesFor(null)[0]);
   const [wantedCustomTicketType, setWantedCustomTicketType] = useState('');
   const [wantedQuantity, setWantedQuantity] = useState(1);
   const [description, setDescription] = useState('');
@@ -188,7 +202,7 @@ export default function SellScreen() {
   function resetForm() {
     setNationId('');
     setCustomOrganizer('');
-    setTicketType(TICKET_TYPES[0]);
+    setTicketType(ticketTypesFor(null)[0]);
     setCustomTicketType('');
     setEventDate('');
     setQuantity(1);
@@ -196,7 +210,7 @@ export default function SellScreen() {
     setPrice('');
     setWantedNationId('');
     setWantedCustomOrganizer('');
-    setWantedTicketType(TICKET_TYPES[0]);
+    setWantedTicketType(ticketTypesFor(null)[0]);
     setWantedCustomTicketType('');
     setWantedQuantity(1);
     setDescription('');
@@ -622,6 +636,7 @@ export default function SellScreen() {
         onSelect={(id) => {
           setNationId(id);
           if (id !== 'other') setCustomOrganizer('');
+          setTicketType((current) => ticketTypeAfterOrganizerChange(current, id));
           setNationPickerOpen(false);
         }}
         onClose={() => setNationPickerOpen(false)}
@@ -631,7 +646,7 @@ export default function SellScreen() {
       <SimplePickerModal
         visible={ticketTypePickerOpen}
         title={t('ticketType')}
-        options={TICKET_TYPES.map((type) => ({ id: type, label: type }))}
+        options={[...ticketTypesFor(nationId), OTHER_TICKET_TYPE].map((type) => ({ id: type, label: type }))}
         selectedId={ticketType}
         onSelect={(id) => {
           setTicketType(id);
@@ -669,7 +684,7 @@ export default function SellScreen() {
       <SimplePickerModal
         visible={wantedTicketTypePickerOpen}
         title={t('ticketType')}
-        options={TICKET_TYPES.map((type) => ({ id: type, label: type }))}
+        options={[...ticketTypesFor(wantedNationId), OTHER_TICKET_TYPE].map((type) => ({ id: type, label: type }))}
         selectedId={wantedTicketType}
         onSelect={(id) => {
           setWantedTicketType(id);
@@ -707,6 +722,7 @@ export default function SellScreen() {
         onSelect={(id) => {
           setWantedNationId(id);
           if (id !== 'other') setWantedCustomOrganizer('');
+          setWantedTicketType((current) => ticketTypeAfterOrganizerChange(current, id));
           setWantedNationPickerOpen(false);
         }}
         onClose={() => setWantedNationPickerOpen(false)}

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SheetKeyboardAvoider } from '@/components/sheet-keyboard-avoider';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -125,128 +128,130 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.six }]}
-          keyboardShouldPersistTaps="handled">
-          <Segmented
-            options={[
-              { id: 'lost', label: t('lostKindLost') },
-              { id: 'found', label: t('lostKindFound') },
-            ]}
-            value={kind}
-            onChange={(next) => setKind(next as LostItemKind)}
-          />
-
-          <View style={styles.field}>
-            <ThemedText style={styles.fieldLabel}>{t('lostWhatLabel')}</ThemedText>
-            <View style={styles.categoryGrid}>
-              {LOST_ITEM_CATEGORIES.map((option) => {
-                const active = category === option;
-
-                return (
-                  <Pressable
-                    key={option}
-                    onPress={() => setCategory(option)}
-                    style={[
-                      styles.categoryChip,
-                      {
-                        backgroundColor: active ? '#FFC8A530' : theme.backgroundElement,
-                        borderColor: active ? '#E39E72' : theme.backgroundSelected,
-                      },
-                    ]}>
-                    <ThemedText style={styles.categoryEmoji}>
-                      {LOST_ITEM_CATEGORY_EMOJI[option]}
-                    </ThemedText>
-                    <ThemedText type="small" style={styles.categoryLabel}>
-                      {t(LOST_ITEM_CATEGORY_KEY[option])}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.field}>
-            <ThemedText style={styles.fieldLabel}>{t('lostWhereLabel')}</ThemedText>
-            <Pressable
-              onPress={() => setNationPickerOpen(true)}
-              style={[
-                styles.selectRow,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected },
-              ]}>
-              <ThemedText themeColor={nationId ? 'text' : 'textSecondary'}>
-                {nationId ? getNation(nationId).name : t('lostChooseNation')}
-              </ThemedText>
-              <ThemedText themeColor="textSecondary">›</ThemedText>
-            </Pressable>
-          </View>
-
-          <View style={styles.field}>
-            <ThemedText style={styles.fieldLabel}>{t('lostWhenLabel')}</ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayRow}>
-              {dayOptions.map((option) => {
-                const active = happenedOn === option.id;
-
-                return (
-                  <Pressable
-                    key={option.id}
-                    onPress={() => setHappenedOn(option.id)}
-                    style={[
-                      styles.dayChip,
-                      {
-                        backgroundColor: active ? '#FFC8A530' : theme.backgroundElement,
-                        borderColor: active ? '#E39E72' : theme.backgroundSelected,
-                      },
-                    ]}>
-                    <ThemedText type="small" style={styles.dayChipText}>
-                      {option.label}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          <View style={styles.field}>
-            <ThemedText style={styles.fieldLabel}>{t('lostDescriptionLabel')}</ThemedText>
-            <TextInput
-              maxLength={MAX_LOST_ITEM_DESCRIPTION}
-              multiline
-              onChangeText={setDescription}
-              placeholder={t(
-                kind === 'found' ? 'lostDescriptionFoundPlaceholder' : 'lostDescriptionLostPlaceholder',
-              )}
-              placeholderTextColor={theme.textSecondary}
-              style={[
-                styles.textArea,
-                {
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.backgroundSelected,
-                  color: theme.text,
-                },
+        <SheetKeyboardAvoider>
+          <ScrollView
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.six }]}
+            keyboardShouldPersistTaps="handled">
+            <Segmented
+              options={[
+                { id: 'lost', label: t('lostKindLost') },
+                { id: 'found', label: t('lostKindFound') },
               ]}
-              value={description}
+              value={kind}
+              onChange={(next) => setKind(next as LostItemKind)}
             />
-            {kind === 'found' && (
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('lostFoundPrivacyHint')}
-              </ThemedText>
-            )}
-          </View>
 
-          {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
+            <View style={styles.field}>
+              <ThemedText style={styles.fieldLabel}>{t('lostWhatLabel')}</ThemedText>
+              <View style={styles.categoryGrid}>
+                {LOST_ITEM_CATEGORIES.map((option) => {
+                  const active = category === option;
 
-          <Pressable
-            disabled={!canSubmit}
-            onPress={handleSubmit}
-            style={[styles.submitButton, { opacity: canSubmit ? 1 : 0.5 }]}>
-            {submitting ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <ThemedText style={styles.submitButtonText}>{t('lostPublish')}</ThemedText>
-            )}
-          </Pressable>
-        </ScrollView>
+                  return (
+                    <Pressable
+                      key={option}
+                      onPress={() => setCategory(option)}
+                      style={[
+                        styles.categoryChip,
+                        {
+                          backgroundColor: active ? '#FFC8A530' : theme.backgroundElement,
+                          borderColor: active ? '#E39E72' : theme.backgroundSelected,
+                        },
+                      ]}>
+                      <ThemedText style={styles.categoryEmoji}>
+                        {LOST_ITEM_CATEGORY_EMOJI[option]}
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.categoryLabel}>
+                        {t(LOST_ITEM_CATEGORY_KEY[option])}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <ThemedText style={styles.fieldLabel}>{t('lostWhereLabel')}</ThemedText>
+              <Pressable
+                onPress={() => setNationPickerOpen(true)}
+                style={[
+                  styles.selectRow,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected },
+                ]}>
+                <ThemedText themeColor={nationId ? 'text' : 'textSecondary'}>
+                  {nationId ? getNation(nationId).name : t('lostChooseNation')}
+                </ThemedText>
+                <ThemedText themeColor="textSecondary">›</ThemedText>
+              </Pressable>
+            </View>
+
+            <View style={styles.field}>
+              <ThemedText style={styles.fieldLabel}>{t('lostWhenLabel')}</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayRow}>
+                {dayOptions.map((option) => {
+                  const active = happenedOn === option.id;
+
+                  return (
+                    <Pressable
+                      key={option.id}
+                      onPress={() => setHappenedOn(option.id)}
+                      style={[
+                        styles.dayChip,
+                        {
+                          backgroundColor: active ? '#FFC8A530' : theme.backgroundElement,
+                          borderColor: active ? '#E39E72' : theme.backgroundSelected,
+                        },
+                      ]}>
+                      <ThemedText type="small" style={styles.dayChipText}>
+                        {option.label}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.field}>
+              <ThemedText style={styles.fieldLabel}>{t('lostDescriptionLabel')}</ThemedText>
+              <TextInput
+                maxLength={MAX_LOST_ITEM_DESCRIPTION}
+                multiline
+                onChangeText={setDescription}
+                placeholder={t(
+                  kind === 'found' ? 'lostDescriptionFoundPlaceholder' : 'lostDescriptionLostPlaceholder',
+                )}
+                placeholderTextColor={theme.textSecondary}
+                style={[
+                  styles.textArea,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.backgroundSelected,
+                    color: theme.text,
+                  },
+                ]}
+                value={description}
+              />
+              {kind === 'found' && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('lostFoundPrivacyHint')}
+                </ThemedText>
+              )}
+            </View>
+
+            {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
+
+            <Pressable
+              disabled={!canSubmit}
+              onPress={handleSubmit}
+              style={[styles.submitButton, { opacity: canSubmit ? 1 : 0.5 }]}>
+              {submitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <ThemedText style={styles.submitButtonText}>{t('lostPublish')}</ThemedText>
+              )}
+            </Pressable>
+          </ScrollView>
+        </SheetKeyboardAvoider>
 
         <NationPicker
           visible={nationPickerOpen}
@@ -329,7 +334,7 @@ function NationPicker({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={styles.pickerBackdrop}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.pickerBackdrop}>
         <Pressable accessibilityLabel={t('cancel')} onPress={onClose} style={StyleSheet.absoluteFill} />
         <ThemedView
           type="backgroundElement"
@@ -371,7 +376,7 @@ function NationPicker({
             ))}
           </ScrollView>
         </ThemedView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

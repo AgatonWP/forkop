@@ -397,8 +397,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    minHeight: 48,
+    // The Hitta header's metrics (index.tsx): 2 + 2 pt above a 36 pt row, 8
+    // below. Centring the row in 48 instead put this tab's + button 2 pt lower
+    // than the one on Hitta.
+    minHeight: 36,
+    paddingBottom: Spacing.two,
     paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.half * 2,
   },
   headerTitle: {
     fontSize: 17,
