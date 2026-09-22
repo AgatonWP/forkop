@@ -66,6 +66,16 @@ export type Listing = {
 /** Ticket types every organizer sells. The form adds the free-text 'Annan' last. */
 export const BASE_TICKET_TYPES = ['Förköp', 'Eftersläpp'];
 
+type OrganizerTicketTypes = {
+  types: string[];
+  /**
+   * Picking the organizer selects the first of these, for organizers where
+   * that is nearly always what is being sold. Otherwise the form stays on
+   * Förköp and these are just offered at the top of the list.
+   */
+  preselect?: boolean;
+};
+
 /**
  * Types particular to one organizer, offered first once it is picked.
  * Lundakarnevalen's Efterkarnevalen was being posted as "Förköp" with its real
@@ -73,19 +83,28 @@ export const BASE_TICKET_TYPES = ['Förköp', 'Eftersläpp'];
  * could reach it. Add an organizer here when it sells something the two base
  * types do not describe.
  */
-const ORGANIZER_TICKET_TYPES: Record<string, string[]> = {
-  karneval: ['Efterkarnevalen'],
+const ORGANIZER_TICKET_TYPES: Record<string, OrganizerTicketTypes> = {
+  karneval: { types: ['Efterkarnevalen'], preselect: true },
+  // Malmö Nation's autumn events. Possibly one night under two names, but
+  // kept apart so a ticket can be found by whichever name is printed on it.
+  malmo: { types: ['September Haze', 'Höstyran'] },
 };
 
 export function ticketTypesFor(organizerId: string | null | undefined): string[] {
-  const special = organizerId ? (ORGANIZER_TICKET_TYPES[organizerId] ?? []) : [];
+  const special = organizerId ? (ORGANIZER_TICKET_TYPES[organizerId]?.types ?? []) : [];
   return [...special, ...BASE_TICKET_TYPES];
+}
+
+/** The type to select when this organizer is picked, if it has one. */
+export function preselectedTicketTypeFor(organizerId: string): string | null {
+  const special = ORGANIZER_TICKET_TYPES[organizerId];
+  return special?.preselect ? special.types[0] : null;
 }
 
 /** Every ticket type the feed's filter offers. */
 export const FILTERABLE_TICKET_TYPES = [
   ...BASE_TICKET_TYPES,
-  ...Object.values(ORGANIZER_TICKET_TYPES).flat(),
+  ...Object.values(ORGANIZER_TICKET_TYPES).flatMap(({ types }) => types),
 ];
 
 export const MAX_EXACT_TICKET_QUANTITY = 20;

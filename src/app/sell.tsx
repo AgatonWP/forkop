@@ -28,6 +28,7 @@ import { NATIONS_LIST, getNation, listedWithoutSearch } from '@/lib/nations';
 import {
   DealType,
   ListingDirection,
+  preselectedTicketTypeFor,
   ticketTypesFor,
   MORE_THAN_MAX_TICKET_QUANTITY,
   describeListingError,
@@ -56,16 +57,16 @@ const DATE_OPTION_DAYS = 180;
 const TOP_EDGES: Edge[] = Platform.OS === 'ios' ? [] : ['top'];
 
 /**
- * Picking an organizer with its own ticket types preselects the first of them —
- * whoever picks Lundakarnevalen is almost certainly selling Efterkarnevalen —
- * and moving away from it drops a type the new organizer does not have. A
- * free-text "Annan" is always kept.
+ * Some organizers preselect their own ticket type — whoever picks
+ * Lundakarnevalen is almost certainly selling Efterkarnevalen — and moving to
+ * another organizer drops a type it does not have, back to Förköp. A free-text
+ * "Annan" is always kept.
  */
 function ticketTypeAfterOrganizerChange(current: string, organizerId: string) {
-  const options = ticketTypesFor(organizerId);
   if (current === OTHER_TICKET_TYPE) return current;
-  if (options[0] !== ticketTypesFor(null)[0]) return options[0];
-  return options.includes(current) ? current : options[0];
+  const preselected = preselectedTicketTypeFor(organizerId);
+  if (preselected) return preselected;
+  return ticketTypesFor(organizerId).includes(current) ? current : ticketTypesFor(null)[0];
 }
 
 export default function SellScreen() {
