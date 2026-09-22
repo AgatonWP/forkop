@@ -60,6 +60,9 @@ import {
   toLocalDateId,
 } from '@/lib/tickets';
 
+// Shared by the search row and the filter row, so their columns line up.
+const FILTER_ROW_GAP = 6;
+
 const TICKET_TYPE_FILTERS = FILTERABLE_TICKET_TYPES.map((type) => ({ id: type, label: type }));
 
 const DEAL_FILTERS = [
@@ -440,33 +443,41 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <View style={styles.filters}>
               {/* Search and Köp | Sälj share one row, half each, so the feed
-                  starts a row higher. */}
+                  starts a row higher. Same gap as the filter row below, so the
+                  search field ends exactly where the second filter does. Each
+                  sits in a bare half of its own: a flex item's padding and
+                  border count on top of its share, and on web a TextInput
+                  also keeps its intrinsic width. */}
               <View style={styles.searchRow}>
-                <TextInput
-                  value={search}
-                  onChangeText={setSearch}
-                  // Half a row is too narrow for a second example.
-                  placeholder='"förköp casa"...'
-                  placeholderTextColor="rgba(104,114,131,0.62)"
-                  style={[
-                    styles.searchInput,
-                    {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: '#E39E7233',
-                      color: theme.text,
-                    },
-                  ]}
-                />
+                <View style={styles.searchRowHalf}>
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    // Half a row is too narrow for a second example.
+                    placeholder='"förköp casa"...'
+                    placeholderTextColor="rgba(104,114,131,0.62)"
+                    style={[
+                      styles.searchInput,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: '#E39E7233',
+                        color: theme.text,
+                      },
+                    ]}
+                  />
+                </View>
 
-                <SideSwitch
-                  options={[
-                    { id: 'buy', label: t('sideBuy') },
-                    { id: 'sell', label: t('sideSell') },
-                  ]}
-                  value={side}
-                  onChange={setSide}
-                  style={styles.searchRowHalf}
-                />
+                <View style={styles.searchRowHalf}>
+                  <SideSwitch
+                    options={[
+                      { id: 'buy', label: t('sideBuy') },
+                      { id: 'sell', label: t('sideSell') },
+                    ]}
+                    value={side}
+                    onChange={setSide}
+                    style={styles.searchRowFill}
+                  />
+                </View>
               </View>
 
               <View style={styles.filterBarRow}>
@@ -1297,9 +1308,12 @@ const styles = StyleSheet.create({
   },
   searchRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
+    gap: FILTER_ROW_GAP,
   },
   searchRowHalf: {
+    flex: 1,
+  },
+  searchRowFill: {
     flex: 1,
   },
   emptyCta: {
@@ -1336,12 +1350,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     minHeight: 44,
-    minWidth: 0,
     paddingHorizontal: Spacing.three,
+    width: '100%',
   },
   filterBarRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: FILTER_ROW_GAP,
   },
   filterBarButton: {
     borderRadius: 8,
