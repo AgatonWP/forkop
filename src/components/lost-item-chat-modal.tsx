@@ -23,9 +23,9 @@ import { blockUser, getBlockStatus } from '@/lib/blocking';
 import { useI18n } from '@/lib/i18n';
 import {
   LOST_ITEM_CATEGORY_EMOJI,
-  LOST_ITEM_CATEGORY_KEY,
   LostItem,
   lostItemPlaceName,
+  lostItemTitle,
 } from '@/lib/lost-items';
 import {
   Conversation,
@@ -217,7 +217,7 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
           <View style={styles.headerCopy}>
             <ThemedText numberOfLines={1} style={styles.headerTitle}>
               {item
-                ? `${LOST_ITEM_CATEGORY_EMOJI[item.category]} ${t(LOST_ITEM_CATEGORY_KEY[item.category])}`
+                ? `${LOST_ITEM_CATEGORY_EMOJI[item.category]} ${lostItemTitle(item, t)}`
                 : ''}
             </ThemedText>
             {item && (

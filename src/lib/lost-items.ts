@@ -14,24 +14,32 @@ export const LOST_ITEM_CATEGORIES = [
   'phone',
   'keys',
   'wallet',
+  'id',
   'headphones',
   'bag',
   'jewelry',
+  'watch',
   'clothing',
   'other',
 ] as const;
 
 export type LostItemCategory = (typeof LOST_ITEM_CATEGORIES)[number];
 
-/** Read at a glance in a list, which a row of nine words would not be. */
+function isLostItemCategory(value: string): value is LostItemCategory {
+  return (LOST_ITEM_CATEGORIES as readonly string[]).includes(value);
+}
+
+/** Read at a glance in a list, which a row of eleven words would not be. */
 export const LOST_ITEM_CATEGORY_EMOJI: Record<LostItemCategory, string> = {
   jacket: '🧥',
   phone: '📱',
   keys: '🔑',
   wallet: '👛',
+  id: '🪪',
   headphones: '🎧',
   bag: '🎒',
   jewelry: '💍',
+  watch: '⌚',
   clothing: '👕',
   other: '❓',
 };
@@ -41,12 +49,17 @@ export const LOST_ITEM_CATEGORY_KEY: Record<LostItemCategory, TranslationKey> = 
   phone: 'lostCategoryPhone',
   keys: 'lostCategoryKeys',
   wallet: 'lostCategoryWallet',
+  id: 'lostCategoryId',
   headphones: 'lostCategoryHeadphones',
   bag: 'lostCategoryBag',
   jewelry: 'lostCategoryJewelry',
+  watch: 'lostCategoryWatch',
   clothing: 'lostCategoryClothing',
   other: 'lostCategoryOther',
 };
+
+/** Mirrors the check constraint on lost_items.item_name. */
+export const MAX_LOST_ITEM_NAME = 40;
 
 /** Mirrors the check constraint on lost_items.description. */
 export const MAX_LOST_ITEM_DESCRIPTION = 300;
@@ -62,8 +75,10 @@ export type LostItem = {
   userId: string;
   kind: LostItemKind;
   category: LostItemCategory;
+  /** Free text under "Annat" in "Vad?", like "paraply". */
+  itemName?: string;
   nationId: string;
-  /** Free text under "Annat", like "utanför Clemens Falafel". */
+  /** Free text under "Annat" in "Var?", like "utanför Clemens Falafel". */
   place?: string;
   happenedOn: string;
   description?: string;
@@ -77,7 +92,8 @@ type LostItemRow = {
   id: string;
   user_id: string;
   kind: LostItemKind;
-  category: LostItemCategory;
+  category: string;
+  item_name?: string | null;
   nation_id: string;
   place?: string | null;
   happened_on: string;
@@ -89,11 +105,12 @@ type LostItemRow = {
 };
 
 const LOST_ITEM_COLUMNS =
-  'id,user_id,kind,category,nation_id,place,happened_on,description,status,reporter_name,reporter_avatar_url,created_at';
+  'id,user_id,kind,category,item_name,nation_id,place,happened_on,description,status,reporter_name,reporter_avatar_url,created_at';
 
-// The same list from before places existed, so the feed still loads against a
-// database where 20260922090000_lost_item_place.sql has not been run yet.
-const LEGACY_LOST_ITEM_COLUMNS = LOST_ITEM_COLUMNS.replace('place,', '');
+// The same list from before item names and places existed, so the feed still
+// loads against a database where 20260922090000_lost_item_place.sql and
+// 20260922120000_lost_item_categories.sql have not been run yet.
+const LEGACY_LOST_ITEM_COLUMNS = LOST_ITEM_COLUMNS.replace('item_name,', '').replace('place,', '');
 
 type LostItemQueryResult = PromiseLike<{
   data: unknown[] | null;
@@ -103,7 +120,7 @@ type LostItemQueryResult = PromiseLike<{
 async function selectLostItems(query: (columns: string) => LostItemQueryResult): Promise<LostItem[]> {
   let { data, error } = await query(LOST_ITEM_COLUMNS);
 
-  // 42703: undefined column — the database predates places.
+  // 42703: undefined column — the database predates item names or places.
   if (error?.code === '42703') {
     ({ data, error } = await query(LEGACY_LOST_ITEM_COLUMNS));
   }
@@ -118,7 +135,10 @@ function mapLostItem(row: LostItemRow): LostItem {
     id: row.id,
     userId: row.user_id,
     kind: row.kind,
-    category: row.category,
+    // A category added after this app version was built reads as "Annat"
+    // rather than as a blank card.
+    category: isLostItemCategory(row.category) ? row.category : 'other',
+    itemName: row.item_name ?? undefined,
     nationId: row.nation_id,
     place: row.place ?? undefined,
     happenedOn: row.happened_on,
@@ -167,6 +187,11 @@ export async function fetchLostItemsByIds(ids: string[]): Promise<LostItem[]> {
   return selectLostItems((columns) => supabase.from('lost_items').select(columns).in('id', ids));
 }
 
+/** What a post is about: its free-text name when it has one, else the category. */
+export function lostItemTitle(item: LostItem, t: (key: TranslationKey) => string) {
+  return item.itemName ?? t(LOST_ITEM_CATEGORY_KEY[item.category]);
+}
+
 /** Where a post is from: its free-text place when it has one, else the nation. */
 export function lostItemPlaceName(item: LostItem) {
   return item.place ?? getNation(item.nationId).name;
@@ -176,6 +201,7 @@ export async function createLostItem(input: {
   userId: string;
   kind: LostItemKind;
   category: LostItemCategory;
+  itemName?: string;
   nationId: string;
   place?: string;
   happenedOn: string;
@@ -183,15 +209,17 @@ export async function createLostItem(input: {
   reporterName?: string;
   reporterAvatarUrl?: string;
 }): Promise<LostItem> {
+  const itemName = input.itemName?.trim();
   const place = input.place?.trim();
-  // The place and its column go in only when there is one, so a post without
-  // a place still saves before 20260922090000_lost_item_place.sql has run.
+  // Item name and place, and their columns, go in only when there is one, so
+  // a post without them still saves before their migrations have run.
   const { data, error } = await supabase
     .from('lost_items')
     .insert({
       user_id: input.userId,
       kind: input.kind,
       category: input.category,
+      ...(itemName ? { item_name: itemName } : {}),
       nation_id: input.nationId,
       ...(place ? { place } : {}),
       happened_on: input.happenedOn,
@@ -199,7 +227,7 @@ export async function createLostItem(input: {
       reporter_name: input.reporterName ?? null,
       reporter_avatar_url: input.reporterAvatarUrl ?? null,
     })
-    .select(place ? LOST_ITEM_COLUMNS : LEGACY_LOST_ITEM_COLUMNS)
+    .select(itemName || place ? LOST_ITEM_COLUMNS : LEGACY_LOST_ITEM_COLUMNS)
     .single();
 
   if (error) throw error;

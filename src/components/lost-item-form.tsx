@@ -28,11 +28,12 @@ import {
   LostItemCategory,
   LostItemKind,
   MAX_LOST_ITEM_DESCRIPTION,
+  MAX_LOST_ITEM_NAME,
   MAX_LOST_ITEM_PLACE,
   createLostItem,
   lostItemErrorKey,
 } from '@/lib/lost-items';
-import { NATIONS_LIST, getNation, listedWithoutSearch, normalizeSearchText } from '@/lib/nations';
+import { PLACES, getNation, listedWithoutSearch, normalizeSearchText } from '@/lib/nations';
 import { formatListingEventDate, toLocalDateId } from '@/lib/tickets';
 
 type Props = {
@@ -50,6 +51,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
 
   const [kind, setKind] = useState<LostItemKind>(initialKind);
   const [category, setCategory] = useState<LostItemCategory | null>(null);
+  const [itemName, setItemName] = useState('');
   const [nationId, setNationId] = useState<string | null>(null);
   const [nationPickerOpen, setNationPickerOpen] = useState(false);
   const [place, setPlace] = useState('');
@@ -63,6 +65,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
 
     setKind(initialKind);
     setCategory(null);
+    setItemName('');
     setNationId(null);
     setPlace('');
     setHappenedOn(toLocalDateId(new Date()));
@@ -105,6 +108,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
         userId: user.id,
         kind,
         category,
+        itemName: category === 'other' ? itemName : undefined,
         nationId,
         place: nationId === 'other' ? place : undefined,
         happenedOn,
@@ -172,6 +176,26 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
                   );
                 })}
               </View>
+              {/* Optional, like the place below: "Annat" alone says little. */}
+              {category === 'other' && (
+                <TextInput
+                  maxLength={MAX_LOST_ITEM_NAME}
+                  onChangeText={setItemName}
+                  placeholder={t('lostItemNamePlaceholder')}
+                  placeholderTextColor={theme.textSecondary}
+                  returnKeyType="done"
+                  style={[
+                    styles.selectRow,
+                    styles.freeTextInput,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.backgroundSelected,
+                      color: theme.text,
+                    },
+                  ]}
+                  value={itemName}
+                />
+              )}
             </View>
 
             <View style={styles.field}>
@@ -197,7 +221,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
                   returnKeyType="done"
                   style={[
                     styles.selectRow,
-                    styles.placeInput,
+                    styles.freeTextInput,
                     {
                       backgroundColor: theme.backgroundElement,
                       borderColor: theme.backgroundSelected,
@@ -347,9 +371,9 @@ function NationPicker({
 
   const options = useMemo(() => {
     const normalized = normalizeSearchText(query.trim());
-    if (!normalized) return NATIONS_LIST.filter((nation) => listedWithoutSearch(nation, selectedId));
+    if (!normalized) return PLACES.filter((nation) => listedWithoutSearch(nation, selectedId));
 
-    return NATIONS_LIST.filter((nation) =>
+    return PLACES.filter((nation) =>
       normalizeSearchText([nation.id, nation.name, nation.shortName, ...nation.aliases].join(' ')).includes(
         normalized,
       ),
@@ -487,7 +511,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
     paddingHorizontal: Spacing.three,
   },
-  placeInput: {
+  freeTextInput: {
     fontSize: 16,
   },
   dayRow: {

@@ -27,12 +27,12 @@ import { blockUser } from '@/lib/blocking';
 import { useI18n } from '@/lib/i18n';
 import {
   LOST_ITEM_CATEGORY_EMOJI,
-  LOST_ITEM_CATEGORY_KEY,
   LostItem,
   LostItemKind,
   deleteLostItem,
   fetchOpenLostItems,
   lostItemPlaceName,
+  lostItemTitle,
   resolveLostItem,
 } from '@/lib/lost-items';
 import { formatListingEventDate, formatRelativeTime } from '@/lib/tickets';
@@ -328,7 +328,7 @@ function LostItemCard({
       <View style={styles.cardTop}>
         <ThemedText style={styles.cardEmoji}>{LOST_ITEM_CATEGORY_EMOJI[item.category]}</ThemedText>
         <View style={styles.cardCopy}>
-          <ThemedText style={styles.cardTitle}>{t(LOST_ITEM_CATEGORY_KEY[item.category])}</ThemedText>
+          <ThemedText style={styles.cardTitle}>{lostItemTitle(item, t)}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {`${lostItemPlaceName(item)} · ${formatListingEventDate(item.happenedOn, language)}`}
           </ThemedText>

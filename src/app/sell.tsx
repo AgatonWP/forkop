@@ -24,7 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
-import { NATIONS_LIST, getNation, listedWithoutSearch } from '@/lib/nations';
+import { ORGANIZERS, getNation, listedWithoutSearch } from '@/lib/nations';
 import {
   DealType,
   ListingDirection,
@@ -857,7 +857,7 @@ function SuccessState({
 
 type PickerOption = { id: string; label: string; searchTerms?: string[]; searchOnly?: boolean };
 
-const ORGANIZER_OPTIONS: PickerOption[] = NATIONS_LIST.map((nation) => ({
+const ORGANIZER_OPTIONS: PickerOption[] = ORGANIZERS.map((nation) => ({
   id: nation.id,
   label: nation.name,
   searchTerms: [nation.shortName, ...nation.aliases],

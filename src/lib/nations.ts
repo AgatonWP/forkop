@@ -14,6 +14,8 @@ export interface Nation {
    * its name, and stays visible wherever it is already the one chosen.
    */
   searchOnly?: boolean;
+  /** A place rather than an organizer: offered under "Var?" in Borttappat only. */
+  placeOnly?: boolean;
 }
 
 export const NATIONS_LIST: Nation[] = [
@@ -35,6 +37,8 @@ export const NATIONS_LIST: Nation[] = [
   { id: 'afborgen', name: 'AF-borgen', shortName: 'AF', aliases: ['af', 'afb', 'af borgen', 'af-borgen', 'borgen', 'tbar', 't-bar', 'tibban'], color: '#C2410C' },
   { id: 'mejeriet', name: 'Mejeriet', shortName: 'MJ', aliases: ['mj', 'mejeri', 'mejeriet'], color: '#6D28D9' },
   { id: 'stadsparken', name: 'Stadsparken', shortName: 'SP', aliases: ['sp', 'stadsparken', 'stadspark'], color: '#16A34A' },
+  // The hall in Kårhuset at LTH where the sections hold their eftersläpp.
+  { id: 'gasquesalen', name: 'Gasquesalen', shortName: 'GQ', aliases: ['gq', 'gasque', 'gasquen', 'gasquesalen', 'kårhuset', 'karhuset'], color: '#475569', placeOnly: true },
   // LTH:s kårsektioner (TLTH)
   { id: 'f-sektionen', name: 'F-sektionen', shortName: 'F', aliases: ['f', 'f-sektionen', 'teknisk fysik', 'teknisk matematik', 'teknisk nanovetenskap', 'fysik'], color: '#F59E0B', kind: 'section' },
   { id: 'e-sektionen', name: 'E-sektionen', shortName: 'E', aliases: ['e', 'e-sektionen', 'elektroteknik', 'medicin och teknik'], color: '#059669', kind: 'section' },
@@ -49,6 +53,16 @@ export const NATIONS_LIST: Nation[] = [
   { id: 'i-sektionen', name: 'I-sektionen', shortName: 'I', aliases: ['i', 'i-sektionen', 'industriell ekonomi'], color: '#F97316', kind: 'section' },
   { id: 'other', name: 'Annat', shortName: '??', aliases: ['annat', 'annan', 'other', 'ovrigt', 'övrigt'], color: '#6B7280' },
 ];
+
+/** Who can be behind a ticket: everyone but the bare places. */
+export const ORGANIZERS = NATIONS_LIST.filter((nation) => !nation.placeOnly);
+
+/**
+ * Where something can go missing: everyone but the sections, which are student
+ * bodies rather than places. Their eftersläpp are at Gasquesalen, which is
+ * listed for that reason.
+ */
+export const PLACES = NATIONS_LIST.filter((nation) => nation.kind !== 'section');
 
 export function normalizeSearchText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');

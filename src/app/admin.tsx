@@ -20,7 +20,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { checkIsAdmin } from '@/lib/admin';
 import { useI18n } from '@/lib/i18n';
 import { LOST_ITEM_CATEGORY_EMOJI, LOST_ITEM_CATEGORY_KEY, LostItemCategory, adminDeleteLostItem } from '@/lib/lost-items';
-import { NATIONS_LIST, getNation } from '@/lib/nations';
+import { ORGANIZERS, getNation } from '@/lib/nations';
 import { AdminReport, dismissReport, fetchOpenReports } from '@/lib/reports';
 import { adminDeleteListing, fetchAllListingsAdmin, getListingOrganizerName, Listing } from '@/lib/tickets';
 import {
@@ -33,7 +33,7 @@ import {
 } from '@/lib/verified-organizers';
 
 // "Annat" isn't a real organizer, and the database rejects verifying it.
-const VERIFIABLE_ORGANIZERS = NATIONS_LIST.filter(({ id }) => id !== 'other');
+const VERIFIABLE_ORGANIZERS = ORGANIZERS.filter(({ id }) => id !== 'other');
 
 function useLostItemSubject() {
   const { t } = useI18n();

@@ -35,7 +35,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { TranslationKey, useI18n } from '@/lib/i18n';
-import { NATIONS_LIST, getNation, getNationSearchText, listedWithoutSearch, normalizeSearchText } from '@/lib/nations';
+import { ORGANIZERS, getNation, getNationSearchText, listedWithoutSearch, normalizeSearchText } from '@/lib/nations';
 import { getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
 import {
@@ -66,7 +66,7 @@ const DEAL_FILTERS = [
   { id: 'trade', translationKey: 'tradeListing' },
 ] as const;
 
-const NATION_FILTER_OPTIONS = NATIONS_LIST.map((nation) => ({
+const NATION_FILTER_OPTIONS = ORGANIZERS.map((nation) => ({
   id: nation.id,
   label: nation.name,
   searchTerms: [nation.shortName, ...nation.aliases],
