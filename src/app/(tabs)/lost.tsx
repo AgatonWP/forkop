@@ -32,9 +32,9 @@ import {
   LostItemKind,
   deleteLostItem,
   fetchOpenLostItems,
+  lostItemPlaceName,
   resolveLostItem,
 } from '@/lib/lost-items';
-import { getNation } from '@/lib/nations';
 import { formatListingEventDate, formatRelativeTime } from '@/lib/tickets';
 
 export default function LostScreen() {
@@ -330,7 +330,7 @@ function LostItemCard({
         <View style={styles.cardCopy}>
           <ThemedText style={styles.cardTitle}>{t(LOST_ITEM_CATEGORY_KEY[item.category])}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {`${getNation(item.nationId).name} · ${formatListingEventDate(item.happenedOn, language)}`}
+            {`${lostItemPlaceName(item)} · ${formatListingEventDate(item.happenedOn, language)}`}
           </ThemedText>
         </View>
         <NationEmblem nationId={item.nationId} />

@@ -25,6 +25,7 @@ import {
   LOST_ITEM_CATEGORY_EMOJI,
   LOST_ITEM_CATEGORY_KEY,
   LostItem,
+  lostItemPlaceName,
 } from '@/lib/lost-items';
 import {
   Conversation,
@@ -37,7 +38,6 @@ import {
   sendMessage,
   subscribeToMessages,
 } from '@/lib/messages';
-import { getNation } from '@/lib/nations';
 import { formatListingEventDate } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
 
@@ -222,7 +222,7 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
             </ThemedText>
             {item && (
               <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-                {`${t(item.kind === 'found' ? 'lostSegmentFound' : 'lostSegmentLost')} · ${getNation(item.nationId).name} · ${formatListingEventDate(item.happenedOn, language)}`}
+                {`${t(item.kind === 'found' ? 'lostSegmentFound' : 'lostSegmentLost')} · ${lostItemPlaceName(item)} · ${formatListingEventDate(item.happenedOn, language)}`}
               </ThemedText>
             )}
           </View>

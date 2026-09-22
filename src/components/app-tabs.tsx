@@ -1,11 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 import { useThemeMode } from '@/lib/theme-mode';
 import { useUnreadMessages } from '@/lib/unread-messages';
+
+/**
+ * The tab you are on shows its icon a size up and lowered into the middle of
+ * the bar, filling the space its hidden label leaves. React Navigation draws
+ * every icon twice, a focused and an unfocused copy, and swaps between them,
+ * so `focused` says which copy this is and the change lands with the swap.
+ */
+function TabIcon({ focused, children }: { focused: boolean; children: ReactNode }) {
+  return <View style={focused && styles.iconFocused}>{children}</View>;
+}
 
 /**
  * Four destinations, ordered by how often they are opened, with the profile
@@ -45,7 +56,9 @@ export default function AppTabs() {
           title: t('buy'),
           tabBarLabel: label(t('buy')),
           tabBarIcon: ({ focused, size }) => (
-            <Text style={{ fontSize: size, opacity: focused ? 1 : 0.5 }}>🕺</Text>
+            <TabIcon focused={focused}>
+              <Text style={{ fontSize: size, opacity: focused ? 1 : 0.5 }}>🕺</Text>
+            </TabIcon>
           ),
         }}
       />
@@ -61,7 +74,9 @@ export default function AppTabs() {
                 : unreadConversationCount
               : undefined,
           tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons color={color} name={focused ? 'chatbubble' : 'chatbubble-outline'} size={size} />
+            <TabIcon focused={focused}>
+              <Ionicons color={color} name={focused ? 'chatbubble' : 'chatbubble-outline'} size={size} />
+            </TabIcon>
           ),
         }}
       />
@@ -71,7 +86,9 @@ export default function AppTabs() {
           title: t('lostTab'),
           tabBarLabel: label(t('lostTab')),
           tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons color={color} name={focused ? 'search' : 'search-outline'} size={size} />
+            <TabIcon focused={focused}>
+              <Ionicons color={color} name={focused ? 'search' : 'search-outline'} size={size} />
+            </TabIcon>
           ),
         }}
       />
@@ -81,11 +98,13 @@ export default function AppTabs() {
           title: t('profile'),
           tabBarLabel: label(t('profile')),
           tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons
-              color={color}
-              name={focused ? 'person-circle' : 'person-circle-outline'}
-              size={size}
-            />
+            <TabIcon focused={focused}>
+              <Ionicons
+                color={color}
+                name={focused ? 'person-circle' : 'person-circle-outline'}
+                size={size}
+              />
+            </TabIcon>
           ),
         }}
       />
@@ -94,6 +113,11 @@ export default function AppTabs() {
 }
 
 const styles = StyleSheet.create({
+  iconFocused: {
+    // The bar is 49 pt tall and the icon's 28 pt box starts 5 pt down it, so
+    // the icon is centred at 19 pt against the bar's 24.5.
+    transform: [{ translateY: 5.5 }, { scale: 1.2 }],
+  },
   label: {
     // Four tabs leave room for the full words again.
     fontSize: 12,

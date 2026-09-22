@@ -28,6 +28,7 @@ import {
   LostItemCategory,
   LostItemKind,
   MAX_LOST_ITEM_DESCRIPTION,
+  MAX_LOST_ITEM_PLACE,
   createLostItem,
   lostItemErrorKey,
 } from '@/lib/lost-items';
@@ -51,6 +52,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
   const [category, setCategory] = useState<LostItemCategory | null>(null);
   const [nationId, setNationId] = useState<string | null>(null);
   const [nationPickerOpen, setNationPickerOpen] = useState(false);
+  const [place, setPlace] = useState('');
   const [happenedOn, setHappenedOn] = useState(() => toLocalDateId(new Date()));
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +64,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
     setKind(initialKind);
     setCategory(null);
     setNationId(null);
+    setPlace('');
     setHappenedOn(toLocalDateId(new Date()));
     setDescription('');
     setError(null);
@@ -103,6 +106,7 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
         kind,
         category,
         nationId,
+        place: nationId === 'other' ? place : undefined,
         happenedOn,
         description,
         reporterName: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? undefined,
@@ -183,6 +187,26 @@ export function LostItemForm({ visible, initialKind, onClose, onCreated }: Props
                 </ThemedText>
                 <ThemedText themeColor="textSecondary">›</ThemedText>
               </Pressable>
+              {/* Optional: "Annat" alone says nothing about where to look. */}
+              {nationId === 'other' && (
+                <TextInput
+                  maxLength={MAX_LOST_ITEM_PLACE}
+                  onChangeText={setPlace}
+                  placeholder={t('lostPlacePlaceholder')}
+                  placeholderTextColor={theme.textSecondary}
+                  returnKeyType="done"
+                  style={[
+                    styles.selectRow,
+                    styles.placeInput,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.backgroundSelected,
+                      color: theme.text,
+                    },
+                  ]}
+                  value={place}
+                />
+              )}
             </View>
 
             <View style={styles.field}>
@@ -462,6 +486,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 46,
     paddingHorizontal: Spacing.three,
+  },
+  placeInput: {
+    fontSize: 16,
   },
   dayRow: {
     gap: Spacing.two,
