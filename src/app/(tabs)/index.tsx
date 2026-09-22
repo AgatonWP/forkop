@@ -46,6 +46,7 @@ import {
 } from '@/lib/ticket-watches';
 import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 import { ReportModal } from '@/components/report-modal';
+import { SideSwitch } from '@/components/side-switch';
 import {
   FILTERABLE_TICKET_TYPES,
   Listing,
@@ -438,15 +439,14 @@ export default function HomeScreen() {
           ]}
           ListHeaderComponent={
             <View style={styles.filters}>
-              {/* Search and Köp | Sälj share one row, so the feed starts a
-                  row higher. The switch is dark enough to read as the page's
-                  main control; fixed colours rather than theme ones, as it is
-                  its own dark surface in both light and dark mode. */}
+              {/* Search and Köp | Sälj share one row, half each, so the feed
+                  starts a row higher. */}
               <View style={styles.searchRow}>
                 <TextInput
                   value={search}
                   onChangeText={setSearch}
-                  placeholder='"förköp casa", "gbg"...'
+                  // Half a row is too narrow for a second example.
+                  placeholder='"förköp casa"...'
                   placeholderTextColor="rgba(104,114,131,0.62)"
                   style={[
                     styles.searchInput,
@@ -458,25 +458,15 @@ export default function HomeScreen() {
                   ]}
                 />
 
-                <View style={styles.sideSegment}>
-                  {(['buy', 'sell'] as const).map((option) => {
-                    const active = side === option;
-
-                    return (
-                      <Pressable
-                        key={option}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        onPress={() => setSide(option)}
-                        style={[styles.sideSegmentItem, active && styles.sideSegmentItemActive]}>
-                        <ThemedText
-                          style={[styles.sideSegmentLabel, active && styles.sideSegmentLabelActive]}>
-                          {t(option === 'buy' ? 'sideBuy' : 'sideSell')}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <SideSwitch
+                  options={[
+                    { id: 'buy', label: t('sideBuy') },
+                    { id: 'sell', label: t('sideSell') },
+                  ]}
+                  value={side}
+                  onChange={setSide}
+                  style={styles.searchRowHalf}
+                />
               </View>
 
               <View style={styles.filterBarRow}>
@@ -1309,29 +1299,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
   },
-  sideSegment: {
-    backgroundColor: '#3A4452',
-    borderRadius: 999,
-    flexDirection: 'row',
-    padding: 3,
-  },
-  sideSegmentItem: {
-    alignItems: 'center',
-    borderRadius: 999,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  sideSegmentItemActive: {
-    backgroundColor: '#FFFFFF',
-  },
-  sideSegmentLabel: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  sideSegmentLabelActive: {
-    color: '#1D2430',
+  searchRowHalf: {
+    flex: 1,
   },
   emptyCta: {
     alignItems: 'center',

@@ -16,6 +16,7 @@ import {
 import { Edge, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetKeyboardAvoider } from '@/components/sheet-keyboard-avoider';
+import { SideSwitch } from '@/components/side-switch';
 import { SingleDateCalendarModal } from '@/components/single-date-calendar-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -325,10 +326,16 @@ export default function SellScreen() {
                 </View>
               )}
 
-              <View style={[styles.segment, { backgroundColor: theme.backgroundSelected }]}>
-                <SegmentButton label={t('iSell')} active={!wanted} onPress={() => setDirection('offer')} />
-                <SegmentButton label={t('iSeek')} active={wanted} onPress={() => setDirection('wanted')} />
-              </View>
+              {/* The same switch as Köp | Sälj on Hitta, full width here. */}
+              <SideSwitch
+                options={[
+                  { id: 'offer', label: t('iSell') },
+                  { id: 'wanted', label: t('iSeek') },
+                ]}
+                value={direction}
+                onChange={setDirection}
+                style={styles.directionSwitch}
+              />
 
               {/* 1. Nation / arrangör */}
               <FormSection label={t('nationOrganizer')}>
@@ -1173,6 +1180,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
+  directionSwitch: {
+    height: 46,
+  },
   segment: {
     borderRadius: 10,
     flexDirection: 'row',
