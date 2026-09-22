@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChatModal } from '@/components/chat-modal';
@@ -17,12 +17,14 @@ import {
   Message,
   fetchConversationsForUser,
   fetchLatestMessages,
+  hideConversation,
+  isHiddenFor,
 } from '@/lib/messages';
 import {
   LOST_ITEM_CATEGORY_EMOJI,
-  LOST_ITEM_CATEGORY_KEY,
   LostItem,
   fetchLostItemsByIds,
+  lostItemTitle,
 } from '@/lib/lost-items';
 import { Listing, conversationRoles, fetchListingsByIds, formatRelativeTime } from '@/lib/tickets';
 import { useUnreadMessages } from '@/lib/unread-messages';
@@ -91,7 +93,12 @@ export default function MessagesScreen() {
             isOwner: conversation.sellerId === user.id,
           };
         })
-        .filter((item): item is InboxItem => item !== null && item.lastMessage !== null)
+        .filter(
+          (item): item is InboxItem =>
+            item !== null &&
+            item.lastMessage !== null &&
+            !isHiddenFor(item.conversation, user.id, item.lastMessage),
+        )
         .sort((a, b) => {
           const aTime = a.lastMessage?.sentAt.getTime() ?? a.conversation.createdAt.getTime();
           const bTime = b.lastMessage?.sentAt.getTime() ?? b.conversation.createdAt.getTime();
@@ -159,6 +166,34 @@ export default function MessagesScreen() {
     setRefreshing(true);
     loadInbox().finally(() => setRefreshing(false));
   }, [loadInbox]);
+  const removeFromInbox = useCallback((conversationId: string) => {
+    setItems((current) => current.filter((item) => item.conversation.id !== conversationId));
+  }, []);
+
+  // Long press, like in most messaging apps. The same choice is in the ⋯ menu
+  // inside the chat.
+  const confirmHide = useCallback(
+    (item: InboxItem) => {
+      Alert.alert(t('deleteConversationTitle'), t('deleteConversationMessage'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await hideConversation(item.conversation.id);
+              removeFromInbox(item.conversation.id);
+              refreshUnreadMessages();
+            } catch {
+              Alert.alert(t('deleteConversationError'));
+            }
+          },
+        },
+      ]);
+    },
+    [refreshUnreadMessages, removeFromInbox, t],
+  );
+
   const unreadConversationIdSet = useMemo(
     () => new Set(unreadConversationIds),
     [unreadConversationIds],
@@ -194,6 +229,7 @@ export default function MessagesScreen() {
               item={item}
               isUnread={unreadConversationIdSet.has(item.conversation.id)}
               onPress={() => setOpenItem(item)}
+              onLongPress={() => confirmHide(item)}
             />
           )}
           ListEmptyComponent={
@@ -217,6 +253,7 @@ export default function MessagesScreen() {
         listing={openItem?.subject.kind === 'listing' ? openItem.subject.listing : null}
         conversationId={openItem?.conversation.id}
         onClose={() => setOpenItem(null)}
+        onHidden={removeFromInbox}
         onListingSold={(soldListing) => {
           const replace = (item: InboxItem): InboxItem =>
             item.subject.kind === 'listing' && item.subject.listing.id === soldListing.id
@@ -232,12 +269,32 @@ export default function MessagesScreen() {
         item={openItem?.subject.kind === 'lostItem' ? openItem.subject.lostItem : null}
         conversationId={openItem?.conversation.id}
         onClose={() => setOpenItem(null)}
+        onHidden={removeFromInbox}
+        onResolved={(resolved) => {
+          const replace = (item: InboxItem): InboxItem =>
+            item.subject.kind === 'lostItem' && item.subject.lostItem.id === resolved.id
+              ? { ...item, subject: { kind: 'lostItem', lostItem: resolved } }
+              : item;
+
+          setItems((current) => current.map(replace));
+          setOpenItem((current) => (current ? replace(current) : current));
+        }}
       />
     </ThemedView>
   );
 }
 
-function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: boolean; onPress: () => void }) {
+function InboxRow({
+  item,
+  isUnread,
+  onPress,
+  onLongPress,
+}: {
+  item: InboxItem;
+  isUnread: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
   const theme = useTheme();
   const { t } = useI18n();
   const { user } = useAuth();
@@ -245,7 +302,7 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
   const subjectLabel =
     subject.kind === 'listing'
       ? subject.listing.eventName
-      : `${LOST_ITEM_CATEGORY_EMOJI[subject.lostItem.category]} ${t(LOST_ITEM_CATEGORY_KEY[subject.lostItem.category])}`;
+      : `${LOST_ITEM_CATEGORY_EMOJI[subject.lostItem.category]} ${lostItemTitle(subject.lostItem, t)}`;
   const ownerName =
     subject.kind === 'listing' ? subject.listing.sellerName : subject.lostItem.reporterName;
   const otherPartyName = item.isOwner
@@ -271,6 +328,7 @@ function InboxRow({ item, isUnread, onPress }: { item: InboxItem; isUnread: bool
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [
         styles.row,
         isUnread && styles.rowUnread,

@@ -3,7 +3,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { Platform } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
-import { fetchConversationsForUser, fetchLatestMessages } from '@/lib/messages';
+import { fetchConversationsForUser, fetchLatestMessages, isHiddenFor } from '@/lib/messages';
 import { supabase } from '@/lib/supabase';
 
 const STORAGE_KEY = 'forkop-last-read';
@@ -65,7 +65,8 @@ export function UnreadMessagesProvider({ children }: { children: ReactNode }) {
 
       const unread = conversations.flatMap((conversation) => {
         const latest = latestByConversation.get(conversation.id);
-        if (!latest || latest.fromMe) return [];
+        // A removed conversation counts again only once something new arrives.
+        if (!latest || latest.fromMe || isHiddenFor(conversation, user.id, latest)) return [];
 
         const readAt = lastRead[conversation.id];
         return !readAt || latest.sentAt.getTime() > new Date(readAt).getTime()

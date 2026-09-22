@@ -285,7 +285,15 @@ export default function LostScreen() {
         }}
       />
 
-      <LostItemChatModal item={chatItem} onClose={() => setChatItem(null)} />
+      <LostItemChatModal
+        item={chatItem}
+        onClose={() => setChatItem(null)}
+        onResolved={(resolved) => {
+          setItems((current) => current.filter((existing) => existing.id !== resolved.id));
+          setChatItem(resolved);
+          setToast(t('lostResolvedToast'));
+        }}
+      />
 
       <ReportModal
         visible={!!reportItem}

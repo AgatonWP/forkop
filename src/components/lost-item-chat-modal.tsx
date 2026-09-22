@@ -1,92 +1,43 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 
-import { ReportModal } from '@/components/report-modal';
-import { SheetKeyboardAvoider } from '@/components/sheet-keyboard-avoider';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { ChatMenuAction, ChatScreen } from '@/components/chat-screen';
 import { useAuth } from '@/lib/auth';
-import { blockUser, getBlockStatus } from '@/lib/blocking';
 import { useI18n } from '@/lib/i18n';
 import {
   LOST_ITEM_CATEGORY_EMOJI,
   LostItem,
   lostItemPlaceName,
   lostItemTitle,
+  resolveLostItem,
 } from '@/lib/lost-items';
-import {
-  Conversation,
-  ConversationRateLimitError,
-  Message,
-  MessageRateLimitError,
-  fetchConversation,
-  fetchMessages,
-  getOrCreateLostItemConversation,
-  sendMessage,
-  subscribeToMessages,
-} from '@/lib/messages';
+import { Conversation, fetchConversation, getOrCreateLostItemConversation } from '@/lib/messages';
 import { formatListingEventDate } from '@/lib/tickets';
-import { useUnreadMessages } from '@/lib/unread-messages';
-
-/** Matches the check constraint on messages.body. */
-const MAX_MESSAGE_LENGTH = 2000;
 
 type Props = {
   item: LostItem | null;
   /** Passed when opening from the inbox, where the conversation already exists. */
   conversationId?: string;
   onClose: () => void;
+  /** After the owner marked the item returned from here. */
+  onResolved?: (item: LostItem) => void;
+  /** After the user removed this conversation from their inbox. */
+  onHidden?: (conversationId: string) => void;
 };
 
 /**
- * Deliberately not ChatModal: that one carries price, Swish, "mark as sold" and
- * ratings, none of which mean anything for a jacket someone left behind. The
- * messages underneath are the same table, so the inbox, unread counts and push
- * notifications are shared.
+ * The chat about a lost item: the same ChatScreen as for tickets, with the
+ * item in the header instead of the listing and "Återlämnad" in place of
+ * "Markera som såld". No Swish or ratings — nothing is being sold.
  */
-export function LostItemChatModal({ item, conversationId, onClose }: Props) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
+export function LostItemChatModal({ item, conversationId, onClose, onResolved, onHidden }: Props) {
   const { user } = useAuth();
   const { language, t } = useI18n();
-  const { markConversationRead } = useUnreadMessages();
-
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [sendError, setSendError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [blocked, setBlocked] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const promptedFor = useRef<string | null>(null);
 
-  const isOwnPost = !!user && !!item && item.userId === user.id;
-
-  useEffect(() => {
-    if (!item || !user) return;
-
-    let active = true;
-    setLoading(true);
-    setLoadError(null);
-    setConversation(null);
-    setMessages([]);
-
-    const load = conversationId
+  const loadConversation = useCallback(() => {
+    if (!item || !user) return Promise.reject(new Error('No item'));
+    return conversationId
       ? fetchConversation(conversationId)
       : getOrCreateLostItemConversation(
           item.id,
@@ -94,341 +45,49 @@ export function LostItemChatModal({ item, conversationId, onClose }: Props) {
           user.user_metadata?.full_name ?? user.email?.split('@')[0],
           user.user_metadata?.avatar_url,
         );
+  }, [conversationId, item, user]);
 
-    load
-      .then(async (conv) => {
-        if (!active) return;
-        setConversation(conv);
-        const existing = await fetchMessages(conv.id, user.id);
-        if (!active) return;
-        setMessages(existing);
-        markConversationRead(conv.id);
-      })
-      .catch((error) => {
-        if (!active) return;
-        setLoadError(
-          error instanceof ConversationRateLimitError
-            ? t('chatStartRateLimited')
-            : t('chatLoadError'),
-        );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+  const isOwnPost = !!user && !!item && item.userId === user.id;
 
-    return () => {
-      active = false;
-    };
-  }, [conversationId, item, markConversationRead, t, user]);
-
-  useEffect(() => {
-    if (!conversation || !user) return;
-    return subscribeToMessages(conversation.id, user.id, (message) => {
-      setMessages((current) =>
-        current.some((existing) => existing.id === message.id) ? current : [...current, message],
-      );
-    });
-  }, [conversation, user]);
-
-  useEffect(() => {
-    if (!item || !user || isOwnPost) return;
-
-    getBlockStatus(item.userId)
-      .then((status) => setBlocked(status.interactionBlocked))
-      .catch(() => setBlocked(false));
-  }, [isOwnPost, item, user]);
-
-  // The claim is the whole point of the screen, so the first message starts
-  // written: on a found item it asks for a detail only the owner would know,
-  // which is what keeps someone from claiming a stranger's keys.
-  useEffect(() => {
-    if (!item || loading || messages.length > 0 || isOwnPost) return;
-    if (promptedFor.current === item.id) return;
-
-    promptedFor.current = item.id;
-    setDraft(item.kind === 'found' ? t('lostClaimPrompt') : t('lostHavePrompt'));
-  }, [isOwnPost, item, loading, messages.length, t]);
-
-  const handleSend = useCallback(async () => {
-    const text = draft.trim();
-    if (!conversation || !user || !text || sending) return;
-
-    setSending(true);
-    setSendError(null);
+  const handleResolve = useCallback(async () => {
+    if (!item || !user || !isOwnPost) return;
 
     try {
-      const message = await sendMessage(conversation.id, user.id, text.slice(0, MAX_MESSAGE_LENGTH));
-      setMessages((current) =>
-        current.some((existing) => existing.id === message.id) ? current : [...current, message],
-      );
-      setDraft('');
-    } catch (error) {
-      setSendError(
-        error instanceof MessageRateLimitError ? t('chatRateLimited') : t('chatSendError'),
-      );
-    } finally {
-      setSending(false);
+      await resolveLostItem(item.id, user.id);
+      onResolved?.({ ...item, status: 'resolved' });
+    } catch {
+      Alert.alert(t('lostResolveError'));
     }
-  }, [conversation, draft, sending, t, user]);
+  }, [isOwnPost, item, onResolved, t, user]);
 
-  function handleSafetyActions() {
-    if (!item || !user || isOwnPost) return;
+  const menuActions = useMemo<ChatMenuAction[]>(
+    () => (isOwnPost && item?.status === 'open' ? [{ text: t('lostMarkResolved'), onPress: handleResolve }] : []),
+    [handleResolve, isOwnPost, item?.status, t],
+  );
 
-    Alert.alert(t('safetyActions'), undefined, [
-      { text: t('reportUser'), onPress: () => setReportOpen(true) },
-      {
-        text: t('blockUser'),
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert(t('blockUser'), t('blockUserConfirmation'), [
-            { text: t('cancel'), style: 'cancel' },
-            {
-              text: t('blockUser'),
-              style: 'destructive',
-              onPress: async () => {
-                try {
-                  await blockUser(user.id, item.userId);
-                  setBlocked(true);
-                } catch {
-                  setSendError(t('blockUserError'));
-                }
-              },
-            },
-          ]),
-      },
-      { text: t('cancel'), style: 'cancel' },
-    ]);
-  }
-
-  const canSend = !!draft.trim() && !sending && !blocked;
+  const otherPartyName = isOwnPost
+    ? (conversation?.buyerName ?? t('chatUnknownName'))
+    : (item?.reporterName ?? t('chatUnknownName'));
+  const otherPartyAvatarUrl = isOwnPost ? conversation?.buyerAvatarUrl : item?.reporterAvatarUrl;
+  const subtitle = item
+    ? [
+        `${LOST_ITEM_CATEGORY_EMOJI[item.category]} ${lostItemTitle(item, t)}`,
+        t(item.kind === 'found' ? 'lostSegmentFound' : 'lostSegmentLost'),
+        lostItemPlaceName(item),
+        formatListingEventDate(item.happenedOn, language),
+      ].join(' · ')
+    : '';
 
   return (
-    <Modal visible={!!item} animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
-      <ThemedView style={styles.screen}>
-        <View
-          style={[
-            styles.header,
-            { borderBottomColor: theme.backgroundSelected, paddingTop: Spacing.three },
-          ]}>
-          <Pressable hitSlop={12} onPress={onClose} style={styles.headerButton}>
-            <ThemedText style={styles.headerClose}>‹</ThemedText>
-          </Pressable>
-
-          <View style={styles.headerCopy}>
-            <ThemedText numberOfLines={1} style={styles.headerTitle}>
-              {item
-                ? `${LOST_ITEM_CATEGORY_EMOJI[item.category]} ${lostItemTitle(item, t)}`
-                : ''}
-            </ThemedText>
-            {item && (
-              <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
-                {`${t(item.kind === 'found' ? 'lostSegmentFound' : 'lostSegmentLost')} · ${lostItemPlaceName(item)} · ${formatListingEventDate(item.happenedOn, language)}`}
-              </ThemedText>
-            )}
-          </View>
-
-          {!isOwnPost && (
-            <Pressable
-              accessibilityLabel={t('safetyActions')}
-              hitSlop={12}
-              onPress={handleSafetyActions}
-              style={styles.headerButton}>
-              <Ionicons color={theme.textSecondary} name="ellipsis-horizontal" size={20} />
-            </Pressable>
-          )}
-        </View>
-
-        <SheetKeyboardAvoider style={styles.body}>
-          {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={theme.textSecondary} size="small" />
-            </View>
-          ) : loadError ? (
-            <View style={styles.center}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {loadError}
-              </ThemedText>
-            </View>
-          ) : (
-            <FlatList
-              contentContainerStyle={styles.messageList}
-              data={messages}
-              keyExtractor={(message) => message.id}
-              renderItem={({ item: message }) => (
-                <View
-                  style={[
-                    styles.bubble,
-                    message.fromMe
-                      ? [styles.bubbleMine, { backgroundColor: '#1D2430' }]
-                      : [styles.bubbleTheirs, { backgroundColor: theme.backgroundElement }],
-                  ]}>
-                  <ThemedText style={message.fromMe ? styles.bubbleTextMine : undefined}>
-                    {message.text}
-                  </ThemedText>
-                </View>
-              )}
-              ListEmptyComponent={
-                <View style={styles.center}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {t('noChatYet')}
-                  </ThemedText>
-                </View>
-              }
-            />
-          )}
-
-          {sendError && (
-            <ThemedText style={styles.sendError} type="small">
-              {sendError}
-            </ThemedText>
-          )}
-
-          {blocked ? (
-            <View style={[styles.composer, { paddingBottom: insets.bottom + Spacing.two }]}>
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('lostChatBlocked')}
-              </ThemedText>
-            </View>
-          ) : (
-            <View
-              style={[
-                styles.composer,
-                {
-                  borderTopColor: theme.backgroundSelected,
-                  paddingBottom: insets.bottom + Spacing.two,
-                },
-              ]}>
-              <TextInput
-                maxLength={MAX_MESSAGE_LENGTH}
-                multiline
-                onChangeText={setDraft}
-                placeholder={t('writeMessage')}
-                placeholderTextColor={theme.textSecondary}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.backgroundSelected,
-                    color: theme.text,
-                  },
-                ]}
-                value={draft}
-              />
-              <Pressable
-                accessibilityLabel={t('send')}
-                disabled={!canSend}
-                onPress={handleSend}
-                style={[styles.sendButton, { opacity: canSend ? 1 : 0.45 }]}>
-                {sending ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Ionicons color="#FFFFFF" name="arrow-up" size={20} />
-                )}
-              </Pressable>
-            </View>
-          )}
-        </SheetKeyboardAvoider>
-
-        <ReportModal
-          visible={reportOpen}
-          lostItem={item}
-          mode="chat"
-          onClose={() => setReportOpen(false)}
-        />
-      </ThemedView>
-    </Modal>
+    <ChatScreen
+      chatKey={item ? (conversationId ?? item.id) : null}
+      loadConversation={loadConversation}
+      onClose={onClose}
+      onConversation={setConversation}
+      onHidden={onHidden}
+      header={{ name: otherPartyName, avatarUrl: otherPartyAvatarUrl, subtitle }}
+      menuActions={menuActions}
+      report={{ lostItem: item }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingBottom: Spacing.two,
-    paddingHorizontal: Spacing.three,
-  },
-  headerButton: {
-    alignItems: 'center',
-    height: 32,
-    justifyContent: 'center',
-    minWidth: 28,
-  },
-  headerClose: {
-    fontSize: 30,
-    fontWeight: '500',
-    lineHeight: 30,
-  },
-  headerCopy: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 22,
-  },
-  body: {
-    flex: 1,
-  },
-  center: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    padding: Spacing.four,
-  },
-  messageList: {
-    gap: Spacing.two,
-    padding: Spacing.three,
-  },
-  bubble: {
-    borderRadius: 14,
-    maxWidth: '82%',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  bubbleMine: {
-    alignSelf: 'flex-end',
-  },
-  bubbleTheirs: {
-    alignSelf: 'flex-start',
-  },
-  bubbleTextMine: {
-    color: '#FFFFFF',
-  },
-  sendError: {
-    color: '#C84646',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.one,
-  },
-  composer: {
-    alignItems: 'flex-end',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-  },
-  input: {
-    borderRadius: 18,
-    borderWidth: 1,
-    flex: 1,
-    fontSize: 16,
-    maxHeight: 120,
-    minHeight: 40,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.two,
-  },
-  sendButton: {
-    alignItems: 'center',
-    backgroundColor: '#1D2430',
-    borderRadius: 20,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-});
