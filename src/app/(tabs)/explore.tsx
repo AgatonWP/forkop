@@ -503,22 +503,6 @@ export default function ProfileScreen() {
                   ) : (
                     <SectionNotice text={t('noActiveListings')} />
                   )}
-
-                  {/* Posting left the tab bar, so the place you manage your
-                      listings is the second way in, next to the + on Hitta. */}
-                  <Pressable
-                    onPress={() => router.push('/sell')}
-                    style={({ pressed }) => [
-                      styles.noticeRow,
-                      {
-                        backgroundColor: theme.backgroundElement,
-                        borderColor: theme.backgroundSelected,
-                        opacity: pressed ? 0.7 : 1,
-                      },
-                    ]}>
-                    <Ionicons color={theme.text} name="add" size={18} />
-                    <ThemedText type="smallBold">{t('postListing')}</ThemedText>
-                  </Pressable>
                 </ProfileSection>
 
                 <ProfileSection title={t('soldListings')} count={soldListings.length}>
