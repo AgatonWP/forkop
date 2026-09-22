@@ -54,8 +54,11 @@ const DATE_OPTION_DAYS = 180;
 
 // On iOS this screen is a page sheet, which already starts below the status
 // bar; giving it the top inset as well left a band of empty space above the
-// header. Android shows it full screen, so there the inset is still needed.
+// header, and none at all put the header tight against the sheet's top edge.
+// A small fixed gap sits between the two. Android shows it full screen, so
+// there the inset is still needed.
 const TOP_EDGES: Edge[] = Platform.OS === 'ios' ? [] : ['top'];
+const SHEET_TOP_GAP = Platform.OS === 'ios' ? Spacing.two + Spacing.one : 0;
 
 /**
  * Some organizers preselect their own ticket type — whoever picks
@@ -291,7 +294,7 @@ export default function SellScreen() {
       <SafeAreaView
         edges={TOP_EDGES}
         style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
-        <View style={styles.headerInner}>
+        <View style={[styles.headerInner, { marginTop: SHEET_TOP_GAP }]}>
           {/* Presented as a modal rather than a tab, so it needs its own way out. */}
           <Pressable hitSlop={12} onPress={() => router.back()} style={styles.headerCancel}>
             <ThemedText style={styles.headerCancelText}>{t('cancel')}</ThemedText>

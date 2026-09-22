@@ -438,43 +438,46 @@ export default function HomeScreen() {
           ]}
           ListHeaderComponent={
             <View style={styles.filters}>
-              {/* Dark enough to read as the page's main control, small enough
-                  not to push the listings down. Fixed colours rather than theme
-                  ones: it is its own dark surface in both light and dark mode. */}
-              <View style={styles.sideSegment}>
-                {(['buy', 'sell'] as const).map((option) => {
-                  const active = side === option;
+              {/* Search and Köp | Sälj share one row, so the feed starts a
+                  row higher. The switch is dark enough to read as the page's
+                  main control; fixed colours rather than theme ones, as it is
+                  its own dark surface in both light and dark mode. */}
+              <View style={styles.searchRow}>
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder='"förköp casa", "gbg"...'
+                  placeholderTextColor="rgba(104,114,131,0.62)"
+                  style={[
+                    styles.searchInput,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: '#E39E7233',
+                      color: theme.text,
+                    },
+                  ]}
+                />
 
-                  return (
-                    <Pressable
-                      key={option}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      onPress={() => setSide(option)}
-                      style={[styles.sideSegmentItem, active && styles.sideSegmentItemActive]}>
-                      <ThemedText
-                        style={[styles.sideSegmentLabel, active && styles.sideSegmentLabelActive]}>
-                        {t(option === 'buy' ? 'sideBuy' : 'sideSell')}
-                      </ThemedText>
-                    </Pressable>
-                  );
-                })}
+                <View style={styles.sideSegment}>
+                  {(['buy', 'sell'] as const).map((option) => {
+                    const active = side === option;
+
+                    return (
+                      <Pressable
+                        key={option}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        onPress={() => setSide(option)}
+                        style={[styles.sideSegmentItem, active && styles.sideSegmentItemActive]}>
+                        <ThemedText
+                          style={[styles.sideSegmentLabel, active && styles.sideSegmentLabelActive]}>
+                          {t(option === 'buy' ? 'sideBuy' : 'sideSell')}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder='"förköp casa", "gbg"...'
-                placeholderTextColor="rgba(104,114,131,0.62)"
-                style={[
-                  styles.searchInput,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: '#E39E7233',
-                    color: theme.text,
-                  },
-                ]}
-              />
 
               <View style={styles.filterBarRow}>
                 <FilterBarButton
@@ -1302,8 +1305,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginBottom: Spacing.one,
   },
+  searchRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
   sideSegment: {
-    alignSelf: 'center',
     backgroundColor: '#3A4452',
     borderRadius: 999,
     flexDirection: 'row',
@@ -1312,8 +1318,8 @@ const styles = StyleSheet.create({
   sideSegmentItem: {
     alignItems: 'center',
     borderRadius: 999,
-    paddingHorizontal: 26,
-    paddingVertical: 5,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
   },
   sideSegmentItemActive: {
     backgroundColor: '#FFFFFF',
@@ -1358,8 +1364,10 @@ const styles = StyleSheet.create({
   searchInput: {
     borderRadius: 8,
     borderWidth: 1,
+    flex: 1,
     fontSize: 16,
     minHeight: 44,
+    minWidth: 0,
     paddingHorizontal: Spacing.three,
   },
   filterBarRow: {
