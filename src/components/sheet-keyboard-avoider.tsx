@@ -15,8 +15,9 @@ type Props = {
  * exactly that much and the bottom of the sheet stays under the keyboard —
  * which is what hid the field you were typing in. Measuring where this view
  * actually sits in the window and passing it as the offset makes the two
- * agree. Full-screen screens do not need this; plain KeyboardAvoidingView is
- * right there, as in sell.tsx.
+ * agree. Full-screen screens do not need this, but it is right there too, so
+ * a screen that is a sheet on iOS and full screen elsewhere (sell.tsx) can use
+ * it on every platform.
  */
 export function SheetKeyboardAvoider({ children, style }: Props) {
   const ref = useRef<View>(null);

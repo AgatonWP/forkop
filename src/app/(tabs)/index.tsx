@@ -35,7 +35,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { TranslationKey, useI18n } from '@/lib/i18n';
-import { NATIONS_LIST, getNation, getNationSearchText, normalizeSearchText } from '@/lib/nations';
+import { NATIONS_LIST, getNation, getNationSearchText, listedWithoutSearch, normalizeSearchText } from '@/lib/nations';
 import { getPushEnabled, registerForPushNotifications } from '@/lib/push-notifications';
 import { RatingSummary, fetchRatingSummary } from '@/lib/ratings';
 import {
@@ -70,6 +70,7 @@ const NATION_FILTER_OPTIONS = NATIONS_LIST.map((nation) => ({
   id: nation.id,
   label: nation.name,
   searchTerms: [nation.shortName, ...nation.aliases],
+  searchOnly: nation.searchOnly,
 }));
 
 function formatDayFilterLabel(dateString: string, language: 'sv' | 'en', t: (key: TranslationKey) => string) {
@@ -673,7 +674,7 @@ function FilterBarButton({
   );
 }
 
-type FilterOption = { id: string; label: string; searchTerms?: string[] };
+type FilterOption = { id: string; label: string; searchTerms?: string[]; searchOnly?: boolean };
 
 function FilterOptionModal({
   visible,
@@ -703,14 +704,14 @@ function FilterOptionModal({
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalizeSearchText(query.trim());
-    if (!normalizedQuery) return options;
+    if (!normalizedQuery) return options.filter((option) => listedWithoutSearch(option, selectedId));
 
     return options.filter((option) =>
       normalizeSearchText([option.id, option.label, ...(option.searchTerms ?? [])].join(' ')).includes(
         normalizedQuery,
       ),
     );
-  }, [options, query]);
+  }, [options, query, selectedId]);
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>

@@ -13,8 +13,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Edge, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SheetKeyboardAvoider } from '@/components/sheet-keyboard-avoider';
 import { SingleDateCalendarModal } from '@/components/single-date-calendar-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -23,7 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
-import { SELECTABLE_NATIONS_LIST, getNation } from '@/lib/nations';
+import { NATIONS_LIST, getNation, listedWithoutSearch } from '@/lib/nations';
 import {
   DealType,
   ListingDirection,
@@ -48,6 +49,11 @@ const MAX_ORGANIZER_LENGTH = 40;
 const MAX_CUSTOM_TICKET_TYPE_LENGTH = 30;
 const MAX_DESCRIPTION_LENGTH = 1000;
 const DATE_OPTION_DAYS = 180;
+
+// On iOS this screen is a page sheet, which already starts below the status
+// bar; giving it the top inset as well left a band of empty space above the
+// header. Android shows it full screen, so there the inset is still needed.
+const TOP_EDGES: Edge[] = Platform.OS === 'ios' ? [] : ['top'];
 
 /**
  * Picking an organizer with its own ticket types preselects the first of them —
@@ -258,7 +264,7 @@ export default function SellScreen() {
   if (submitted) {
     return (
       <ThemedView style={styles.screen}>
-        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <SafeAreaView style={styles.safeArea} edges={[...TOP_EDGES, 'bottom']}>
           <ScrollView
             contentContainerStyle={styles.successScrollContent}
             showsVerticalScrollIndicator={false}>
@@ -280,7 +286,7 @@ export default function SellScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView
-        edges={['top']}
+        edges={TOP_EDGES}
         style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
           {/* Presented as a modal rather than a tab, so it needs its own way out. */}
@@ -292,9 +298,7 @@ export default function SellScreen() {
         </View>
       </SafeAreaView>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <SheetKeyboardAvoider>
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[
@@ -621,17 +625,13 @@ export default function SellScreen() {
               )}
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </SheetKeyboardAvoider>
 
       {/* Nation / arrangör picker modal */}
       <SimplePickerModal
         visible={nationPickerOpen}
         title={t('nationOrganizer')}
-        options={SELECTABLE_NATIONS_LIST.map((nation) => ({
-          id: nation.id,
-          label: nation.name,
-          searchTerms: [nation.shortName, ...nation.aliases],
-        }))}
+        options={ORGANIZER_OPTIONS}
         selectedId={nationId}
         onSelect={(id) => {
           setNationId(id);
@@ -713,11 +713,7 @@ export default function SellScreen() {
       <SimplePickerModal
         visible={wantedNationPickerOpen}
         title={t('nationOrganizer')}
-        options={SELECTABLE_NATIONS_LIST.map((nation) => ({
-          id: nation.id,
-          label: nation.name,
-          searchTerms: [nation.shortName, ...nation.aliases],
-        }))}
+        options={ORGANIZER_OPTIONS}
         selectedId={wantedNationId}
         onSelect={(id) => {
           setWantedNationId(id);
@@ -853,7 +849,14 @@ function SuccessState({
   );
 }
 
-type PickerOption = { id: string; label: string; searchTerms?: string[] };
+type PickerOption = { id: string; label: string; searchTerms?: string[]; searchOnly?: boolean };
+
+const ORGANIZER_OPTIONS: PickerOption[] = NATIONS_LIST.map((nation) => ({
+  id: nation.id,
+  label: nation.name,
+  searchTerms: [nation.shortName, ...nation.aliases],
+  searchOnly: nation.searchOnly,
+}));
 
 function normalizePickerSearch(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -896,12 +899,12 @@ function SimplePickerModal({
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalizePickerSearch(query.trim());
-    if (!normalizedQuery) return options;
+    if (!normalizedQuery) return options.filter((option) => listedWithoutSearch(option, selectedId));
 
     return options.filter((option) =>
       normalizePickerSearch([option.id, option.label, ...(option.searchTerms ?? [])].join(' ')).includes(normalizedQuery),
     );
-  }, [options, query]);
+  }, [options, query, selectedId]);
 
   return (
     <Modal

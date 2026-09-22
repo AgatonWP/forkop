@@ -31,7 +31,7 @@ import {
   createLostItem,
   lostItemErrorKey,
 } from '@/lib/lost-items';
-import { SELECTABLE_NATIONS_LIST, getNation, normalizeSearchText } from '@/lib/nations';
+import { NATIONS_LIST, getNation, listedWithoutSearch, normalizeSearchText } from '@/lib/nations';
 import { formatListingEventDate, toLocalDateId } from '@/lib/tickets';
 
 type Props = {
@@ -323,14 +323,14 @@ function NationPicker({
 
   const options = useMemo(() => {
     const normalized = normalizeSearchText(query.trim());
-    if (!normalized) return SELECTABLE_NATIONS_LIST;
+    if (!normalized) return NATIONS_LIST.filter((nation) => listedWithoutSearch(nation, selectedId));
 
-    return SELECTABLE_NATIONS_LIST.filter((nation) =>
+    return NATIONS_LIST.filter((nation) =>
       normalizeSearchText([nation.id, nation.name, nation.shortName, ...nation.aliases].join(' ')).includes(
         normalized,
       ),
     );
-  }, [query]);
+  }, [query, selectedId]);
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>

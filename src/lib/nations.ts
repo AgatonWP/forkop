@@ -4,6 +4,12 @@ export interface Nation {
   shortName: string;
   aliases: string[];
   color: string;
+  /**
+   * A real organizer, but one so seldom needed that it waits in search rather
+   * than taking up a row in every list. It shows up as soon as someone types
+   * its name, and stays visible wherever it is already the one chosen.
+   */
+  searchOnly?: boolean;
 }
 
 export const NATIONS_LIST: Nation[] = [
@@ -20,7 +26,8 @@ export const NATIONS_LIST: Nation[] = [
   { id: 'kalmar', name: 'Kalmar Nation', shortName: 'KA', aliases: ['ka', 'kn', 'kalmar'], color: '#B45309' },
   { id: 'wermlands', name: 'Wermlands Nation', shortName: 'WN', aliases: ['wn', 'wermlands', 'värmlands', 'varmlands', 'wermland'], color: '#1D4ED8' },
   { id: 'smalands', name: 'Smålands Nation', shortName: 'SM', aliases: ['sm', 'sn', 'smalands', 'smålands'], color: '#15803D' },
-  { id: 'karneval', name: 'Lundakarnevalen', shortName: 'LK', aliases: ['lk', 'karneval', 'lundakarnevalen'], color: '#DC2626' },
+  // Karnevalen comes round every four years, so it is searchable rather than listed.
+  { id: 'karneval', name: 'Lundakarnevalen', shortName: 'LK', aliases: ['lk', 'karneval', 'lundakarnevalen'], color: '#DC2626', searchOnly: true },
   { id: 'afborgen', name: 'AF-borgen', shortName: 'AF', aliases: ['af', 'afb', 'af borgen', 'af-borgen', 'borgen', 'tbar', 't-bar', 'tibban'], color: '#C2410C' },
   { id: 'mejeriet', name: 'Mejeriet', shortName: 'MJ', aliases: ['mj', 'mejeri', 'mejeriet'], color: '#6D28D9' },
   { id: 'stadsparken', name: 'Stadsparken', shortName: 'SP', aliases: ['sp', 'stadsparken', 'stadspark'], color: '#16A34A' },
@@ -39,12 +46,6 @@ export const NATIONS_LIST: Nation[] = [
   { id: 'other', name: 'Annat', shortName: '??', aliases: ['annat', 'annan', 'other', 'ovrigt', 'övrigt'], color: '#6B7280' },
 ];
 
-// Keep all known organizers available for existing listings and search, while
-// only exposing currently active choices when a user creates a listing.
-// Lundakarnevalen was left out here, which pushed its sellers to type it in
-// under "Annat" and lose both the organizer filter and its own ticket types.
-export const SELECTABLE_NATIONS_LIST = NATIONS_LIST;
-
 export function normalizeSearchText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -56,6 +57,16 @@ export function getNationSearchText(nation: Nation) {
 export function nationMatchesQuery(nation: Nation, query: string) {
   const normalizedQuery = normalizeSearchText(query.trim());
   return !normalizedQuery || getNationSearchText(nation).includes(normalizedQuery);
+}
+
+/**
+ * Whether a picker lists this organizer before anything is typed. Search-only
+ * organizers wait for a search, unless already the one selected. Leaving one
+ * out altogether — as Lundakarnevalen once was — pushed its sellers to type it
+ * under "Annat" and lose both the organizer filter and its own ticket types.
+ */
+export function listedWithoutSearch(option: { id: string; searchOnly?: boolean }, selectedId: string | null) {
+  return !option.searchOnly || option.id === selectedId;
 }
 
 export function getNation(id: string): Nation {
