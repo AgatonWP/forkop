@@ -95,9 +95,9 @@ type OrganizerTicketTypes = {
  */
 const ORGANIZER_TICKET_TYPES: Record<string, OrganizerTicketTypes> = {
   karneval: { types: ['Efterkarnevalen'], preselect: true },
-  // Malmö Nation's autumn events. Possibly one night under two names, but
-  // kept apart so a ticket can be found by whichever name is printed on it.
-  malmo: { types: ['September Haze', 'Höstyran'] },
+  // Malmö Nation's autumn event goes by both names; one type carrying both
+  // lets search find it under either.
+  malmo: { types: ['September Haze (Höstyran)'] },
 };
 
 function everydayTicketTypesFor(organizerId: string | null | undefined) {
