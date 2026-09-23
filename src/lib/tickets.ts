@@ -85,6 +85,13 @@ type OrganizerTicketTypes = {
    * everyday type and these are just offered at the top of the list.
    */
   preselect?: boolean;
+  /**
+   * The last day a one-off event is offered, as YYYY-MM-DD. After it the types
+   * drop out of the form and the filter on their own, so single nights can be
+   * added here without the lists growing term by term. Listings already posted
+   * keep showing their type; they expire with their own date anyway.
+   */
+  until?: string;
 };
 
 /**
@@ -96,10 +103,19 @@ type OrganizerTicketTypes = {
  */
 const ORGANIZER_TICKET_TYPES: Record<string, OrganizerTicketTypes> = {
   karneval: { types: ['Efterkarnevalen'], preselect: true },
+  // Maskinsektionen's eftersläpp at Gasquesalen on 30 September 2026.
+  maskinsektionen: { types: ['Sensation RED'], until: '2026-09-30' },
   // Malmö Nation's autumn event goes by both names; one type carrying both
   // lets search find it under either.
   malmo: { types: ['September Haze (Höstyran)'] },
 };
+
+/** The organizer's own types, minus any one-off event whose night has passed. */
+function specialTicketTypesFor(organizerId: string | null | undefined) {
+  const special = organizerId ? ORGANIZER_TICKET_TYPES[organizerId] : undefined;
+  if (!special) return undefined;
+  return !special.until || toLocalDateId(new Date()) <= special.until ? special : undefined;
+}
 
 function everydayTicketTypesFor(organizerId: string | null | undefined) {
   const kind = organizerId ? getNation(organizerId).kind : undefined;
@@ -107,8 +123,7 @@ function everydayTicketTypesFor(organizerId: string | null | undefined) {
 }
 
 export function ticketTypesFor(organizerId: string | null | undefined): string[] {
-  const special = organizerId ? (ORGANIZER_TICKET_TYPES[organizerId]?.types ?? []) : [];
-  return [...special, ...everydayTicketTypesFor(organizerId)];
+  return [...(specialTicketTypesFor(organizerId)?.types ?? []), ...everydayTicketTypesFor(organizerId)];
 }
 
 /** The type the form starts on, or falls back to, for this organizer. */
@@ -118,7 +133,7 @@ export function defaultTicketTypeFor(organizerId: string | null | undefined): st
 
 /** The type to select when this organizer is picked, if it has one. */
 export function preselectedTicketTypeFor(organizerId: string): string | null {
-  const special = ORGANIZER_TICKET_TYPES[organizerId];
+  const special = specialTicketTypesFor(organizerId);
   return special?.preselect ? special.types[0] : null;
 }
 
@@ -131,7 +146,7 @@ export const FILTERABLE_TICKET_TYPES = [
   ...new Set([
     ...GENERAL_TICKET_TYPES,
     ...Object.values(KIND_TICKET_TYPES).flat(),
-    ...Object.values(ORGANIZER_TICKET_TYPES).flatMap(({ types }) => types),
+    ...Object.keys(ORGANIZER_TICKET_TYPES).flatMap((id) => specialTicketTypesFor(id)?.types ?? []),
   ]),
 ];
 
