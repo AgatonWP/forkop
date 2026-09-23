@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -53,6 +54,11 @@ export default function MessagesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [openItem, setOpenItem] = useState<InboxItem | null>(null);
+  // Picking several conversations to remove at once. Empty set and off means
+  // the list behaves as usual; a tap opens a chat.
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   const loadInbox = useCallback(async (isActive: () => boolean = () => true) => {
     if (!user) {
@@ -170,6 +176,50 @@ export default function MessagesScreen() {
     setItems((current) => current.filter((item) => item.conversation.id !== conversationId));
   }, []);
 
+  const stopSelecting = useCallback(() => {
+    setSelecting(false);
+    setSelectedIds([]);
+  }, []);
+
+  const toggleSelected = useCallback((conversationId: string) => {
+    setSelectedIds((current) =>
+      current.includes(conversationId)
+        ? current.filter((id) => id !== conversationId)
+        : [...current, conversationId],
+    );
+  }, []);
+
+  const deleteSelected = useCallback(() => {
+    if (selectedIds.length === 0 || deleting) return;
+
+    const single = selectedIds.length === 1;
+
+    Alert.alert(
+      single ? t('deleteConversationTitle') : t('deleteConversationsTitle'),
+      single ? t('deleteConversationMessage') : t('deleteConversationsMessage'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'),
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await Promise.all(selectedIds.map((id) => hideConversation(id)));
+              setItems((current) => current.filter((item) => !selectedIds.includes(item.conversation.id)));
+              refreshUnreadMessages();
+              stopSelecting();
+            } catch {
+              Alert.alert(t('deleteConversationError'));
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [deleting, refreshUnreadMessages, selectedIds, stopSelecting, t]);
+
   // Long press, like in most messaging apps. The same choice is in the ⋯ menu
   // inside the chat.
   const confirmHide = useCallback(
@@ -204,6 +254,23 @@ export default function MessagesScreen() {
       <SafeAreaView edges={['top']} style={[styles.header, { borderBottomColor: theme.backgroundSelected, backgroundColor: theme.backgroundHeader }]}>
         <View style={styles.headerInner}>
           <ThemedText style={styles.headerTitle}>{t('messages')}</ThemedText>
+          {/* The tick turns the list into one you tick things off in, and
+              turns back into Avbryt while you are picking. */}
+          {selecting ? (
+            <Pressable hitSlop={12} onPress={stopSelecting} style={styles.headerAction}>
+              <ThemedText style={styles.headerActionText}>{t('cancel')}</ThemedText>
+            </Pressable>
+          ) : (
+            items.length > 0 && (
+              <Pressable
+                accessibilityLabel={t('selectConversations')}
+                hitSlop={12}
+                onPress={() => setSelecting(true)}
+                style={styles.headerAction}>
+                <Ionicons color={theme.text} name="checkmark-circle-outline" size={24} />
+              </Pressable>
+            )
+          )}
         </View>
       </SafeAreaView>
 
@@ -222,14 +289,20 @@ export default function MessagesScreen() {
           }
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
+            // Room for the delete bar while picking, so the last row stays reachable.
+            { paddingBottom: insets.bottom + BottomTabInset + (selecting ? 80 : Spacing.four) },
           ]}
           renderItem={({ item }) => (
             <InboxRow
               item={item}
               isUnread={unreadConversationIdSet.has(item.conversation.id)}
-              onPress={() => setOpenItem(item)}
-              onLongPress={() => confirmHide(item)}
+              selecting={selecting}
+              selected={selectedIds.includes(item.conversation.id)}
+              onPress={() => (selecting ? toggleSelected(item.conversation.id) : setOpenItem(item))}
+              onLongPress={() => {
+                if (selecting) return;
+                confirmHide(item);
+              }}
             />
           )}
           ListEmptyComponent={
@@ -247,6 +320,31 @@ export default function MessagesScreen() {
             )
           }
         />
+      )}
+
+      {selecting && (
+        <View
+          style={[
+            styles.deleteBar,
+            {
+              backgroundColor: theme.backgroundHeader,
+              borderTopColor: theme.backgroundSelected,
+              paddingBottom: insets.bottom + BottomTabInset,
+            },
+          ]}>
+          <Pressable
+            disabled={selectedIds.length === 0 || deleting}
+            onPress={deleteSelected}
+            style={[styles.deleteButton, { opacity: selectedIds.length === 0 || deleting ? 0.45 : 1 }]}>
+            {deleting ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <ThemedText style={styles.deleteButtonText}>
+                {selectedIds.length > 0 ? `${t('delete')} (${selectedIds.length})` : t('delete')}
+              </ThemedText>
+            )}
+          </Pressable>
+        </View>
       )}
 
       <ChatModal
@@ -287,11 +385,15 @@ export default function MessagesScreen() {
 function InboxRow({
   item,
   isUnread,
+  selecting,
+  selected,
   onPress,
   onLongPress,
 }: {
   item: InboxItem;
   isUnread: boolean;
+  selecting: boolean;
+  selected: boolean;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -338,6 +440,13 @@ function InboxRow({
           opacity: pressed ? 0.72 : closed ? 0.55 : 1,
         },
       ]}>
+      {selecting && (
+        <Ionicons
+          color={selected ? '#1D2430' : theme.textSecondary}
+          name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+          size={24}
+        />
+      )}
       <NationEmblem nationId={nationId} />
       <View style={styles.rowCopy}>
         <View style={styles.rowTitleLine}>
@@ -396,6 +505,39 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
+  },
+  headerAction: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 60,
+    position: 'absolute',
+    right: Spacing.three,
+  },
+  headerActionText: {
+    color: '#4F6FB7',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    position: 'absolute',
+    right: 0,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: '#C84646',
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
   listContent: {
     alignSelf: 'center',
