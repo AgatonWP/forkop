@@ -32,12 +32,23 @@ export function VerifiedOrganizerBadge({ organizerName, style }: Props) {
 export function OfficialAccountBadge({
   name,
   pictureUrl,
+  compact = false,
   style,
 }: {
   name: string;
   pictureUrl?: string;
+  /** Just the tick, for where the name is already on screen — a chat header. */
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  if (compact) {
+    return (
+      <View accessibilityLabel={`${name} · officiellt konto`} style={[styles.badge, styles.compactBadge, style]}>
+        <ThemedText style={styles.text}>✓</ThemedText>
+      </View>
+    );
+  }
+
   return (
     <View accessibilityLabel={`${name} · officiellt konto`} style={[styles.badge, styles.officialBadge, style]}>
       {pictureUrl && <Image contentFit="cover" source={{ uri: pictureUrl }} style={styles.picture} />}
@@ -61,6 +72,11 @@ const styles = StyleSheet.create({
   },
   officialBadge: {
     paddingLeft: 5,
+  },
+  compactBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   picture: {
     backgroundColor: '#FFFFFF',

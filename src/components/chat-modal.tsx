@@ -181,7 +181,8 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold, onH
         name: otherPartyName,
         avatarUrl: otherPartyAvatarUrl,
         nameAccessory: !listing || isOwner ? null : officialName ? (
-          <OfficialAccountBadge name={officialName} />
+          // The header already says who they are, so only the tick here.
+          <OfficialAccountBadge name={officialName} compact />
         ) : isVerifiedOrganizerListing(listing) ? (
           <VerifiedOrganizerBadge />
         ) : null,
