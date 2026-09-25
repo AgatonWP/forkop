@@ -23,6 +23,8 @@ export function listingErrorKey(error: unknown): TranslationKey {
       return 'listingRateLimited';
     case '23W03':
       return 'listingLimitReached';
+    case '23W08':
+      return 'listingQuantityLimited';
     default:
       return 'listingCreateError';
   }
@@ -151,7 +153,19 @@ export const FILTERABLE_TICKET_TYPES = [
 ];
 
 export const MAX_EXACT_TICKET_QUANTITY = 20;
+/** The number that means "more than 20", which is as far as a private seller goes. */
 export const MORE_THAN_MAX_TICKET_QUANTITY = MAX_EXACT_TICKET_QUANTITY + 1;
+/**
+ * An official account says exactly how many it has, up to this many: they come
+ * by whole batches honestly. Held to it by the database as well, see
+ * 20260925090000_official_accounts.sql.
+ */
+export const MAX_OFFICIAL_TICKET_QUANTITY = 50;
+
+/** How high the quantity picker goes for this account. */
+export function maxTicketQuantityFor(isOfficialAccount: boolean) {
+  return isOfficialAccount ? MAX_OFFICIAL_TICKET_QUANTITY : MORE_THAN_MAX_TICKET_QUANTITY;
+}
 
 export function formatRelativeTime(date: Date) {
   const minutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
@@ -198,8 +212,9 @@ export function conversationRoles(
     : { buyerId: conversation.buyerId, sellerId: conversation.sellerId };
 }
 
+/** 21 is the private seller's "20+"; an official account's 22 to 50 are exact. */
 export function formatTicketQuantity(quantity: number) {
-  return quantity >= MORE_THAN_MAX_TICKET_QUANTITY
+  return quantity === MORE_THAN_MAX_TICKET_QUANTITY
     ? `${MAX_EXACT_TICKET_QUANTITY}+`
     : String(quantity);
 }
@@ -251,6 +266,21 @@ async function selectListings(query: (columns: string) => ListingQueryResult): P
   }
 
   return (data ?? []).map((row) => mapListing(row as ListingRow));
+}
+
+/** Counting a listing's tickets up or down from the profile. */
+export async function updateListingQuantity(
+  listingId: string,
+  userId: string,
+  quantity: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('listings')
+    .update({ quantity })
+    .eq('id', listingId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
 }
 
 export function parseListingEventDate(dateString: string) {

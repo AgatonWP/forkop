@@ -1,4 +1,5 @@
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -22,16 +23,54 @@ export function VerifiedOrganizerBadge({ organizerName, style }: Props) {
   );
 }
 
+/**
+ * An official account carries its own name rather than an organizer's: LTH
+ * Griparna sell their spare förköp to other people's events, so "verifierad
+ * arrangör" would say the wrong thing. Their picture rides along, which is how
+ * the tick is recognised at a glance in the feed.
+ */
+export function OfficialAccountBadge({
+  name,
+  pictureUrl,
+  style,
+}: {
+  name: string;
+  pictureUrl?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View accessibilityLabel={`${name} · officiellt konto`} style={[styles.badge, styles.officialBadge, style]}>
+      {pictureUrl && <Image contentFit="cover" source={{ uri: pictureUrl }} style={styles.picture} />}
+      <ThemedText numberOfLines={1} style={styles.text}>
+        ✓ {name}
+      </ThemedText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   badge: {
+    alignItems: 'center',
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: Spacing.one,
     backgroundColor: '#2F74E0',
     borderRadius: 6,
     paddingHorizontal: Spacing.two,
     paddingVertical: 5,
   },
+  officialBadge: {
+    paddingLeft: 5,
+  },
+  picture: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 9,
+    height: 18,
+    width: 18,
+  },
   text: {
     color: '#FFFFFF',
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '800',
   },

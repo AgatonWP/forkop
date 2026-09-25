@@ -26,7 +26,11 @@ import { adminDeleteListing, fetchAllListingsAdmin, getListingOrganizerName, Lis
 import {
   NO_ACCOUNT_WITH_EMAIL,
   VerifiedOrganizerAccount,
+  OfficialAccount,
+  adminAddOfficialAccount,
+  adminListOfficialAccounts,
   adminListVerifiedOrganizers,
+  adminRemoveOfficialAccount,
   adminRevokeOrganizer,
   adminVerifyOrganizer,
   useVerifiedOrganizers,
@@ -58,6 +62,7 @@ export default function AdminScreen() {
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [organizers, setOrganizers] = useState<VerifiedOrganizerAccount[]>([]);
+  const [officialAccounts, setOfficialAccounts] = useState<OfficialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -68,19 +73,27 @@ export default function AdminScreen() {
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const canVerify = !!verifyOrganizerId && verifyEmail.trim().length > 0 && !verifying;
 
+  const [officialEmail, setOfficialEmail] = useState('');
+  const [officialName, setOfficialName] = useState('');
+  const [addingOfficial, setAddingOfficial] = useState(false);
+  const [officialError, setOfficialError] = useState<string | null>(null);
+  const canAddOfficial = officialEmail.trim().length > 0 && officialName.trim().length > 0 && !addingOfficial;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [reportRows, listingRows, organizerRows] = await Promise.all([
+      const [reportRows, listingRows, organizerRows, officialRows] = await Promise.all([
         fetchOpenReports(),
         fetchAllListingsAdmin(),
         adminListVerifiedOrganizers(),
+        adminListOfficialAccounts(),
       ]);
       setReports(reportRows);
       setListings(listingRows);
       setOrganizers(organizerRows);
+      setOfficialAccounts(officialRows);
     } catch {
       setError('Kunde inte hämta data.');
     } finally {
@@ -122,6 +135,55 @@ export default function AdminScreen() {
     } finally {
       setVerifying(false);
     }
+  }
+
+  async function handleAddOfficial() {
+    if (!canAddOfficial) return;
+
+    setAddingOfficial(true);
+    setOfficialError(null);
+
+    try {
+      await adminAddOfficialAccount(officialEmail.trim(), officialName.trim());
+      setOfficialEmail('');
+      setOfficialName('');
+      refreshVerifiedOrganizers();
+      adminListOfficialAccounts()
+        .then(setOfficialAccounts)
+        .catch(() => {
+          // It went through; the list catches up on the next load.
+        });
+    } catch (err) {
+      setOfficialError(
+        err instanceof Error && err.message === NO_ACCOUNT_WITH_EMAIL
+          ? 'Det finns inget konto med den mejladressen. Kontot behöver skapas i appen först.'
+          : 'Kunde inte lägga till kontot.',
+      );
+    } finally {
+      setAddingOfficial(false);
+    }
+  }
+
+  function handleRemoveOfficial(account: OfficialAccount) {
+    Alert.alert('Ta bort officiellt konto', `${account.email} förlorar bocken "${account.name}".`, [
+      { text: 'Avbryt', style: 'cancel' },
+      {
+        text: 'Ta bort',
+        style: 'destructive',
+        onPress: async () => {
+          setBusyId(account.userId);
+          try {
+            await adminRemoveOfficialAccount(account.userId);
+            setOfficialAccounts((prev) => prev.filter((item) => item.userId !== account.userId));
+            refreshVerifiedOrganizers();
+          } catch {
+            Alert.alert('Fel', 'Kunde inte ta bort kontot.');
+          } finally {
+            setBusyId(null);
+          }
+        },
+      },
+    ]);
   }
 
   function handleRevoke(account: VerifiedOrganizerAccount) {
@@ -308,6 +370,75 @@ export default function AdminScreen() {
                           onPress={() => handleRevoke(account)}
                           style={[styles.destructiveButton, styles.selfEndButton, busyId === account.userId && styles.buttonDisabled]}>
                           <ThemedText style={styles.destructiveButtonText}>Återkalla</ThemedText>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.section}>
+                    <ThemedText style={styles.sectionTitle}>Officiella konton ({officialAccounts.length})</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      För föreningar som säljer biljetter till andras evenemang, t.ex. LTH Griparna. Bocken visas på allt
+                      de lägger upp, och de kan ange exakt antal upp till 50 biljetter. Bekräfta alltid med föreningen
+                      först.
+                    </ThemedText>
+
+                    <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                      <TextInput
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        keyboardType="email-address"
+                        onChangeText={(text) => {
+                          setOfficialEmail(text);
+                          setOfficialError(null);
+                        }}
+                        placeholder="Kontots mejladress"
+                        placeholderTextColor={theme.textSecondary}
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                        ]}
+                        value={officialEmail}
+                      />
+                      <TextInput
+                        onChangeText={(text) => {
+                          setOfficialName(text);
+                          setOfficialError(null);
+                        }}
+                        placeholder="Namn på bocken, t.ex. LTH Griparna"
+                        placeholderTextColor={theme.textSecondary}
+                        style={[
+                          styles.input,
+                          { backgroundColor: theme.background, borderColor: theme.backgroundSelected, color: theme.text },
+                        ]}
+                        value={officialName}
+                      />
+
+                      {officialError && <ThemedText style={styles.errorText}>{officialError}</ThemedText>}
+
+                      <Pressable
+                        disabled={!canAddOfficial}
+                        onPress={handleAddOfficial}
+                        style={[styles.primaryButton, !canAddOfficial && styles.buttonDisabled]}>
+                        <ThemedText style={styles.primaryButtonText}>
+                          {addingOfficial ? 'Lägger till...' : 'Gör officiellt'}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+
+                    {officialAccounts.map((account) => (
+                      <View
+                        key={account.userId}
+                        style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                        <ThemedText style={styles.cardTitle}>{account.name}</ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {account.email} · officiellt sedan {account.verifiedAt.toLocaleDateString('sv-SE')}
+                        </ThemedText>
+                        <Pressable
+                          disabled={busyId === account.userId}
+                          onPress={() => handleRemoveOfficial(account)}
+                          style={[styles.destructiveButton, styles.selfEndButton, busyId === account.userId && styles.buttonDisabled]}>
+                          <ThemedText style={styles.destructiveButtonText}>Ta bort</ThemedText>
                         </Pressable>
                       </View>
                     ))}

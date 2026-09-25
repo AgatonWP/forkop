@@ -29,7 +29,7 @@ import { Logo } from '@/components/logo';
 import { getNationImage } from '@/components/nation-emblem';
 import { ThemedText } from '@/components/themed-text';
 import { Toast } from '@/components/toast';
-import { VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
+import { OfficialAccountBadge, VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -937,7 +937,7 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
   const theme = useTheme();
   const { language, t } = useI18n();
   const wanted = listing.direction === 'wanted';
-  const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
+  const { isVerifiedOrganizerListing, officialAccountNameFor } = useVerifiedOrganizers();
   const nation = getNation(listing.nationId);
   const nationImage = getNationImage(listing.nationId);
   const useLogoWatermark = listing.nationId === 'mejeriet';
@@ -1005,6 +1005,12 @@ function ListingCard({ listing, onPress }: { listing: Listing; onPress: () => vo
             </View>
           )}
           {isVerifiedOrganizerListing(listing) && <VerifiedOrganizerBadge />}
+          {officialAccountNameFor(listing.userId) && (
+            <OfficialAccountBadge
+              name={officialAccountNameFor(listing.userId) as string}
+              pictureUrl={listing.sellerAvatarUrl}
+            />
+          )}
           {(listing.dealType === 'sell' || listing.dealType === 'both') && (
             <View style={[styles.badge, styles.sellBadge]}>
               <ThemedText style={styles.sellBadgeText}>
@@ -1053,8 +1059,9 @@ function ListingModal({
   const nationName = listing ? getListingOrganizerName(listing) : '';
   const titleText = listing ? listing.ticketType : '';
   const isOwnListing = !!user && !!listing && listing.userId === user.id;
-  const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
+  const { isVerifiedOrganizerListing, officialAccountNameFor } = useVerifiedOrganizers();
   const showVerifiedBadge = !!listing && isVerifiedOrganizerListing(listing);
+  const officialAccountName = listing ? officialAccountNameFor(listing.userId) : undefined;
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
 
   useEffect(() => {
@@ -1173,6 +1180,9 @@ function ListingModal({
                         {t('postedBy')} {listing.sellerName}
                       </ThemedText>
                       {showVerifiedBadge && <VerifiedOrganizerBadge />}
+                      {officialAccountName && (
+                        <OfficialAccountBadge name={officialAccountName} pictureUrl={listing.sellerAvatarUrl} />
+                      )}
                       {ratingSummary && (
                         <View style={styles.sellerRatingBadge}>
                           <ThemedText

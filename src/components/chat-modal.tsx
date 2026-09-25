@@ -5,7 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { ChatMenuAction, ChatScreen } from '@/components/chat-screen';
 import { RatingModal } from '@/components/rating-modal';
 import { ThemedText } from '@/components/themed-text';
-import { VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
+import { OfficialAccountBadge, VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -42,7 +42,7 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold, onH
   const theme = useTheme();
   const { user } = useAuth();
   const { language, t } = useI18n();
-  const { isVerifiedOrganizerListing } = useVerifiedOrganizers();
+  const { isVerifiedOrganizerListing, officialAccountNameFor } = useVerifiedOrganizers();
   const listingDirection = listing?.direction ?? 'offer';
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
@@ -154,6 +154,8 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold, onH
   );
 
   const isOwner = !!user && !!listing && listing.userId === user.id;
+  // The other party's badge: their own name when the account is official.
+  const officialName = listing ? officialAccountNameFor(isOwner ? conversation?.buyerId ?? '' : listing.userId) : undefined;
   // Mirrors conversationRoles() without needing the conversation to have loaded.
   const iAmBuyer = listing?.direction === 'wanted' ? isOwner : !isOwner;
   const otherPartyName = isOwner ? (conversation?.buyerName ?? t('buyer')) : (listing?.sellerName ?? t('seller'));
@@ -178,7 +180,11 @@ export function ChatModal({ listing, conversationId, onClose, onListingSold, onH
       header={{
         name: otherPartyName,
         avatarUrl: otherPartyAvatarUrl,
-        nameAccessory: listing && !isOwner && isVerifiedOrganizerListing(listing) ? <VerifiedOrganizerBadge /> : null,
+        nameAccessory: !listing || isOwner ? null : officialName ? (
+          <OfficialAccountBadge name={officialName} />
+        ) : isVerifiedOrganizerListing(listing) ? (
+          <VerifiedOrganizerBadge />
+        ) : null,
         subtitle,
         subtitleAccessory:
           !isOwner && ratingSummary ? (

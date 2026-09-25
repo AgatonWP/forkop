@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   LayoutAnimation,
   Modal,
@@ -22,7 +23,7 @@ import { NationEmblem } from '@/components/nation-emblem';
 import { RatingModal } from '@/components/rating-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
+import { OfficialAccountBadge, VerifiedOrganizerBadge } from '@/components/verified-organizer-badge';
 import { BottomTabInset, MaxContentWidth, SecondaryHeaderHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -46,7 +47,10 @@ import {
   formatListingEventDate,
   formatTicketQuantity,
   getListingOrganizerName,
+  listingErrorKey,
   markListingSold,
+  maxTicketQuantityFor,
+  updateListingQuantity,
   restoreListingActive,
 } from '@/lib/tickets';
 import { useVerifiedOrganizers } from '@/lib/verified-organizers';
@@ -61,9 +65,10 @@ export default function ProfileScreen() {
   const { themeMode } = useThemeMode();
   const { t } = useI18n();
   const params = useLocalSearchParams<{ confirmed?: string }>();
-  const { verifiedOrganizerIdFor } = useVerifiedOrganizers();
+  const { officialAccountNameFor, verifiedOrganizerIdFor } = useVerifiedOrganizers();
   const { watches } = useTicketWatches();
   const verifiedOrganizerId = user ? verifiedOrganizerIdFor(user.id) : undefined;
+  const officialAccountName = user ? officialAccountNameFor(user.id) : undefined;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordRepeat, setPasswordRepeat] = useState('');
@@ -329,9 +334,13 @@ export default function ProfileScreen() {
   }
 
   async function handleMarkSold() {
-    if (!user || !deleteCandidate || pendingListingId || deleteCandidate.isSold) return;
+    if (!deleteCandidate) return;
+    await markSold(deleteCandidate);
+  }
 
-    const listing = deleteCandidate;
+  async function markSold(listing: Listing) {
+    if (!user || pendingListingId || listing.isSold) return;
+
     setPendingListingId(listing.id);
     setListingsError(null);
 
@@ -346,6 +355,34 @@ export default function ProfileScreen() {
     } catch {
       setListingsError(t('markSoldError'));
       setDeleteCandidate(null);
+    } finally {
+      setPendingListingId(null);
+    }
+  }
+
+  // Counting down from the profile: an official account with a batch of
+  // förköp crosses them off one at a time as they go.
+  async function handleQuantityChange(listing: Listing, next: number) {
+    if (!user || pendingListingId || next === listing.quantity) return;
+
+    if (next < 1) {
+      Alert.alert(t('soldOutTitle'), t('soldOutMessage'), [
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('markAsSold'), onPress: () => markSold(listing) },
+      ]);
+      return;
+    }
+
+    setPendingListingId(listing.id);
+    setListingsError(null);
+
+    try {
+      await updateListingQuantity(listing.id, user.id, next);
+      setListings((current) =>
+        current.map((item) => (item.id === listing.id ? { ...item, quantity: next } : item)),
+      );
+    } catch (error) {
+      setListingsError(t(listingErrorKey(error)));
     } finally {
       setPendingListingId(null);
     }
@@ -451,6 +488,13 @@ export default function ProfileScreen() {
                         style={styles.profileVerifiedBadge}
                       />
                     )}
+                    {officialAccountName && (
+                      <OfficialAccountBadge
+                        name={officialAccountName}
+                        pictureUrl={user.user_metadata?.avatar_url}
+                        style={styles.profileVerifiedBadge}
+                      />
+                    )}
                   </View>
                   <Pressable
                     disabled={submitting}
@@ -497,7 +541,9 @@ export default function ProfileScreen() {
                         key={listing.id}
                         listing={listing}
                         pending={pendingListingId === listing.id}
+                        maxQuantity={maxTicketQuantityFor(!!officialAccountName)}
                         onDelete={() => setDeleteCandidate(listing)}
+                        onQuantityChange={(next) => handleQuantityChange(listing, next)}
                       />
                     ))
                   ) : (
@@ -889,18 +935,29 @@ function ListingRow({
   sold = false,
   pending = false,
   rating,
+  maxQuantity,
   onDelete,
+  onQuantityChange,
   onRate,
 }: {
   listing: Listing;
   sold?: boolean;
   pending?: boolean;
   rating?: Rating;
+  maxQuantity?: number;
   onDelete: () => void;
+  /** Present on an active listing: the pencil turns the count into a stepper. */
+  onQuantityChange?: (next: number) => void;
   onRate?: () => void;
 }) {
   const theme = useTheme();
   const { language, t } = useI18n();
+  const [editingQuantity, setEditingQuantity] = useState(false);
+  const [quantityDraft, setQuantityDraft] = useState(listing.quantity);
+
+  useEffect(() => {
+    setQuantityDraft(listing.quantity);
+  }, [listing.quantity]);
   const nationName = getListingOrganizerName(listing);
   const listingMeta = [
     nationName,
@@ -935,6 +992,29 @@ function ListingRow({
         <ThemedText numberOfLines={1} type="small" themeColor="textSecondary">
           {listingMeta}
         </ThemedText>
+        {editingQuantity && (
+          <View style={styles.stepper}>
+            <Pressable
+              accessibilityLabel="−"
+              disabled={pending}
+              onPress={() => setQuantityDraft((current) => Math.max(0, current - 1))}
+              style={[styles.stepperButton, { borderColor: theme.backgroundSelected }]}>
+              <ThemedText style={styles.stepperButtonText}>−</ThemedText>
+            </Pressable>
+            <ThemedText style={styles.stepperValue}>
+              {quantityDraft === 0 ? '0' : formatTicketQuantity(quantityDraft)}
+            </ThemedText>
+            <Pressable
+              accessibilityLabel="+"
+              disabled={pending}
+              onPress={() =>
+                setQuantityDraft((current) => Math.min(maxQuantity ?? current, current + 1))
+              }
+              style={[styles.stepperButton, { borderColor: theme.backgroundSelected }]}>
+              <ThemedText style={styles.stepperButtonText}>+</ThemedText>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {showTradeBadge && !sold && (
@@ -972,6 +1052,26 @@ function ListingRow({
         </>
       ) : (
         <View style={styles.actionGroup}>
+          {onQuantityChange && (
+            <Pressable
+              accessibilityLabel={editingQuantity ? t('saveQuantity') : t('editQuantity')}
+              disabled={pending}
+              onPress={() => {
+                if (editingQuantity) {
+                  setEditingQuantity(false);
+                  onQuantityChange(quantityDraft);
+                  return;
+                }
+                setEditingQuantity(true);
+              }}
+              style={[styles.iconButton, { borderColor: theme.backgroundSelected, opacity: pending ? 0.5 : 1 }]}>
+              <Ionicons
+                color={theme.text}
+                name={editingQuantity ? 'checkmark' : 'create-outline'}
+                size={16}
+              />
+            </Pressable>
+          )}
           <Pressable
             accessibilityLabel="Ta bort annons"
             disabled={pending}
@@ -1417,6 +1517,31 @@ const styles = StyleSheet.create({
   actionGroup: {
     flexDirection: 'row',
     gap: 4,
+  },
+  stepper: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingTop: Spacing.one,
+  },
+  stepperButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: 'center',
+    width: 34,
+  },
+  stepperButtonText: {
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  stepperValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    minWidth: 32,
+    textAlign: 'center',
   },
   iconButton: {
     alignItems: 'center',

@@ -23,6 +23,7 @@ import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, SecondaryHeaderHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { useVerifiedOrganizers } from '@/lib/verified-organizers';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { ORGANIZERS, getNation, listedWithoutSearch } from '@/lib/nations';
@@ -32,7 +33,7 @@ import {
   defaultTicketTypeFor,
   preselectedTicketTypeFor,
   ticketTypesFor,
-  MORE_THAN_MAX_TICKET_QUANTITY,
+  maxTicketQuantityFor,
   describeListingError,
   formatListingEventDate,
   formatTicketQuantity,
@@ -40,13 +41,15 @@ import {
 } from '@/lib/tickets';
 
 const OTHER_TICKET_TYPE = 'Annan';
-const QUANTITY_OPTIONS = Array.from({ length: MORE_THAN_MAX_TICKET_QUANTITY }, (_, index) => {
-  const quantity = index + 1;
-  return {
-    id: String(quantity),
-    label: formatTicketQuantity(quantity),
-  };
-});
+function quantityOptionsUpTo(max: number) {
+  return Array.from({ length: max }, (_, index) => {
+    const quantity = index + 1;
+    return {
+      id: String(quantity),
+      label: formatTicketQuantity(quantity),
+    };
+  });
+}
 const MAX_TICKET_PRICE = 3000;
 const MAX_ORGANIZER_LENGTH = 40;
 const MAX_CUSTOM_TICKET_TYPE_LENGTH = 30;
@@ -84,10 +87,15 @@ export default function SellScreen() {
   // söker" is preselected only when the feed sends someone here after finding
   // nothing — the moment a wanted post is what they actually need.
   const params = useLocalSearchParams<{ direction?: string }>();
+  const { officialAccountNameFor } = useVerifiedOrganizers();
   const [direction, setDirection] = useState<ListingDirection>(
     params.direction === 'wanted' ? 'wanted' : 'offer',
   );
   const wanted = direction === 'wanted';
+  // An official account counts its spare tickets exactly; everyone else stops
+  // at "20+".
+  const maxQuantity = maxTicketQuantityFor(!!user && !!officialAccountNameFor(user.id));
+  const quantityOptions = useMemo(() => quantityOptionsUpTo(maxQuantity), [maxQuantity]);
 
   const [nationId, setNationId] = useState('');
   const [customOrganizer, setCustomOrganizer] = useState('');
@@ -415,7 +423,7 @@ export default function SellScreen() {
                         </ThemedText>
                       </Pressable>
                       <Pressable
-                        onPress={() => setQuantity((q) => Math.min(MORE_THAN_MAX_TICKET_QUANTITY, q + 1))}
+                        onPress={() => setQuantity((q) => Math.min(maxQuantity, q + 1))}
                         style={[styles.stepperButton, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
                         <ThemedText style={styles.stepperIcon}>+</ThemedText>
                       </Pressable>
@@ -535,7 +543,7 @@ export default function SellScreen() {
                                 </ThemedText>
                               </Pressable>
                               <Pressable
-                                onPress={() => setWantedQuantity((q) => Math.min(MORE_THAN_MAX_TICKET_QUANTITY, q + 1))}
+                                onPress={() => setWantedQuantity((q) => Math.min(maxQuantity, q + 1))}
                                 style={[styles.stepperButton, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
                                 <ThemedText style={styles.stepperIcon}>+</ThemedText>
                               </Pressable>
@@ -676,7 +684,7 @@ export default function SellScreen() {
       <SimplePickerModal
         visible={quantityPickerOpen}
         title={t('ticketQuantity')}
-        options={QUANTITY_OPTIONS}
+        options={quantityOptions}
         selectedId={String(quantity)}
         onSelect={(id) => {
           setQuantity(Number(id));
@@ -714,7 +722,7 @@ export default function SellScreen() {
       <SimplePickerModal
         visible={wantedQuantityPickerOpen}
         title={t('ticketQuantity')}
-        options={QUANTITY_OPTIONS}
+        options={quantityOptions}
         selectedId={String(wantedQuantity)}
         onSelect={(id) => {
           setWantedQuantity(Number(id));
