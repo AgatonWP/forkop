@@ -95,17 +95,41 @@ export function UnreadMessagesProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
+  // A new message anywhere used to mean refetching every conversation and
+  // every message in them. The payload already says which conversation it is
+  // and who sent it, so the badge lights up from that alone, and a single
+  // catch-up read follows a few seconds later to settle anything the payload
+  // could not answer — a brand new conversation, or a message read on another
+  // device. Realtime only delivers rows the reader is allowed to see.
   useEffect(() => {
     if (!user) return;
 
+    let catchUp: ReturnType<typeof setTimeout> | undefined;
+
     const channel = supabase
       .channel('unread-messages-watch')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        refresh();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const row = payload.new as { conversation_id?: string; sender_id?: string; created_at?: string };
+
+        if (row.conversation_id && row.sender_id !== user.id) {
+          const readAt = lastReadRef.current[row.conversation_id];
+          const readAfterMessage =
+            !!readAt && !!row.created_at && new Date(readAt).getTime() >= new Date(row.created_at).getTime();
+
+          if (!readAfterMessage) {
+            setUnreadConversationIds((current) =>
+              current.includes(row.conversation_id as string) ? current : [...current, row.conversation_id as string],
+            );
+          }
+        }
+
+        clearTimeout(catchUp);
+        catchUp = setTimeout(refresh, 4000);
       })
       .subscribe();
 
     return () => {
+      clearTimeout(catchUp);
       supabase.removeChannel(channel);
     };
   }, [user, refresh]);

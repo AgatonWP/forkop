@@ -236,13 +236,42 @@ export async function fetchMessages(conversationId: string, userId: string, sinc
   return (data ?? []).map((row) => mapMessage(row as MessageRow, userId));
 }
 
-/** Latest message per conversation, for inbox previews. */
+/**
+ * Latest message per conversation, for the inbox previews. One row per
+ * conversation from the database (see 20260926120000_latest_messages.sql)
+ * rather than every message the caller has ever been part of.
+ */
 export async function fetchLatestMessages(
   conversationIds: string[],
   userId: string,
 ): Promise<Map<string, Message>> {
   if (conversationIds.length === 0) return new Map();
 
+  const { data, error } = await supabase.rpc('latest_messages');
+
+  // 42883/PGRST202: the function is missing, i.e. the migration has not been
+  // run yet. The old way still works, it just reads far more than it needs.
+  if (error) {
+    if (error.code === '42883' || error.code === 'PGRST202') {
+      return fetchLatestMessagesWithoutRpc(conversationIds, userId);
+    }
+    throw new Error(error.message);
+  }
+
+  const wanted = new Set(conversationIds);
+  const latest = new Map<string, Message>();
+  for (const row of (data ?? []) as MessageRow[]) {
+    if (wanted.has(row.conversation_id)) {
+      latest.set(row.conversation_id, mapMessage(row, userId));
+    }
+  }
+  return latest;
+}
+
+async function fetchLatestMessagesWithoutRpc(
+  conversationIds: string[],
+  userId: string,
+): Promise<Map<string, Message>> {
   const { data, error } = await supabase
     .from('messages')
     .select(MESSAGE_COLUMNS)
