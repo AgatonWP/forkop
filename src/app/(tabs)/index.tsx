@@ -52,6 +52,7 @@ import {
   Listing,
   daysFromToday,
   fetchActiveListings,
+  LISTING_PAGE_SIZE,
   fetchListingsByIds,
   formatListingEventDate,
   formatRelativeTime,
@@ -115,6 +116,8 @@ export default function HomeScreen() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [listingsError, setListingsError] = useState<string | null>(null);
+  const [hasMoreListings, setHasMoreListings] = useState(false);
+  const [loadingMoreListings, setLoadingMoreListings] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const params = useLocalSearchParams<{ confirmed?: string }>();
@@ -138,6 +141,7 @@ export default function HomeScreen() {
       const items = await fetchActiveListings();
       if (!isActive()) return;
       setListings(items);
+      setHasMoreListings(items.length === LISTING_PAGE_SIZE);
       setListingsError(null);
     } catch {
       if (!isActive()) return;
@@ -147,6 +151,31 @@ export default function HomeScreen() {
       setListingsLoading(false);
     }
   }, [t]);
+
+  // The next page, from the oldest listing in hand. Filtering and search run
+  // over what is loaded, so a search with few hits keeps pulling pages in
+  // (see the effect below) rather than quietly missing older listings.
+  const loadMoreListings = useCallback(async () => {
+    if (!hasMoreListings || loadingMoreListings || listingsLoading) return;
+
+    const oldest = listings[listings.length - 1]?.createdAt;
+    if (!oldest) return;
+
+    setLoadingMoreListings(true);
+
+    try {
+      const older = await fetchActiveListings(oldest);
+      setListings((current) => {
+        const known = new Set(current.map((listing) => listing.id));
+        return [...current, ...older.filter((listing) => !known.has(listing.id))];
+      });
+      setHasMoreListings(older.length === LISTING_PAGE_SIZE);
+    } catch {
+      setHasMoreListings(false);
+    } finally {
+      setLoadingMoreListings(false);
+    }
+  }, [hasMoreListings, listings, listingsLoading, loadingMoreListings]);
 
   useEffect(() => {
     let isMounted = true;
@@ -272,6 +301,15 @@ export default function HomeScreen() {
         return proximityDiff !== 0 ? proximityDiff : aDiff - bDiff;
       });
   }, [nationFilter, ticketTypeFilter, dealFilter, dayFilter, listings, search, sideDirection]);
+
+  // Filters and search read what is loaded, so while a page of results is
+  // thin and there is more to fetch, keep fetching. Without this a search for
+  // something posted last week would come back empty until you scrolled.
+  useEffect(() => {
+    if (filteredListings.length < 12 && hasMoreListings && !loadingMoreListings && !listingsLoading) {
+      loadMoreListings();
+    }
+  }, [filteredListings.length, hasMoreListings, listingsLoading, loadMoreListings, loadingMoreListings]);
 
   // The free-text search is left out on purpose: it matches loosely on event
   // names and nation aliases, which would make it impossible to tell what a
@@ -445,6 +483,15 @@ export default function HomeScreen() {
               paddingBottom: insets.bottom + BottomTabInset + Spacing.four,
             },
           ]}
+          onEndReached={loadMoreListings}
+          onEndReachedThreshold={0.6}
+          ListFooterComponent={
+            loadingMoreListings ? (
+              <View style={styles.loadingMore}>
+                <ActivityIndicator size="small" color={theme.textSecondary} />
+              </View>
+            ) : null
+          }
           ListHeaderComponent={
             <View style={styles.filters}>
               {/* Search and Köp | Sälj share one row, half each, so the feed
@@ -1316,6 +1363,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
     width: '100%',
+  },
+  loadingMore: {
+    paddingVertical: Spacing.three,
   },
   filters: {
     gap: Spacing.two,

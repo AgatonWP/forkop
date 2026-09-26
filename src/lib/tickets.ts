@@ -340,14 +340,20 @@ function mapListing(row: ListingRow): Listing {
   };
 }
 
-export async function fetchActiveListings(): Promise<Listing[]> {
-  return selectListings((columns) =>
-    supabase
-      .from('listings')
-      .select(columns)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false }),
-  );
+/** How many listings the feed asks for at a time. */
+export const LISTING_PAGE_SIZE = 50;
+
+/**
+ * A page of the feed, newest first. `before` continues from the oldest
+ * listing already in hand — by timestamp rather than by row number, so a
+ * listing posted while you scroll cannot push another one past you unseen.
+ */
+export async function fetchActiveListings(before?: Date): Promise<Listing[]> {
+  return selectListings((columns) => {
+    let query = supabase.from('listings').select(columns).eq('status', 'active');
+    if (before) query = query.lt('created_at', before.toISOString());
+    return query.order('created_at', { ascending: false }).limit(LISTING_PAGE_SIZE);
+  });
 }
 
 export async function fetchMyListings(userId: string): Promise<Listing[]> {
