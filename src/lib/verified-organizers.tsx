@@ -29,6 +29,8 @@ export type OfficialAccount = {
 };
 
 export const NO_ACCOUNT_WITH_EMAIL = 'NO_ACCOUNT_WITH_EMAIL';
+/** 23W09 from 20260928090000_admins_are_not_official.sql. */
+export const ACCOUNT_IS_ADMIN = 'ACCOUNT_IS_ADMIN';
 
 async function fetchVerifiedOrganizers(): Promise<Map<string, string>> {
   const { data, error } = await supabase.from('verified_organizers').select('user_id,organizer_id');
@@ -66,6 +68,7 @@ export async function adminAddOfficialAccount(email: string, name: string): Prom
   });
 
   if (error) {
+    if (error.code === '23W09') throw new Error(ACCOUNT_IS_ADMIN);
     throw new Error(error.message.includes('no account with that email') ? NO_ACCOUNT_WITH_EMAIL : error.message);
   }
 }

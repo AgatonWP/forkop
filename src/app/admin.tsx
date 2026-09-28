@@ -26,6 +26,7 @@ import { adminDeleteListing, fetchAllListingsAdmin, getListingOrganizerName, Lis
 import {
   NO_ACCOUNT_WITH_EMAIL,
   VerifiedOrganizerAccount,
+  ACCOUNT_IS_ADMIN,
   OfficialAccount,
   adminAddOfficialAccount,
   adminListOfficialAccounts,
@@ -154,10 +155,13 @@ export default function AdminScreen() {
           // It went through; the list catches up on the next load.
         });
     } catch (err) {
+      const message = err instanceof Error ? err.message : '';
       setOfficialError(
-        err instanceof Error && err.message === NO_ACCOUNT_WITH_EMAIL
+        message === NO_ACCOUNT_WITH_EMAIL
           ? 'Det finns inget konto med den mejladressen. Kontot behöver skapas i appen först.'
-          : 'Kunde inte lägga till kontot.',
+          : message === ACCOUNT_IS_ADMIN
+            ? 'Kontot är admin. Ett konto kan inte vara både admin och officiellt konto.'
+            : 'Kunde inte lägga till kontot.',
       );
     } finally {
       setAddingOfficial(false);
