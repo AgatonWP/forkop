@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
 import { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -7,6 +8,16 @@ import { Colors } from '@/constants/theme';
 import { useI18n } from '@/lib/i18n';
 import { useThemeMode } from '@/lib/theme-mode';
 import { useUnreadMessages } from '@/lib/unread-messages';
+
+/**
+ * iOS 26 draws its own bars in glass. This bar is ours — four tabs with an
+ * emoji, a label that hides itself and an icon that grows — so it gets the
+ * glass behind it instead: the same material, under a bar we still decide the
+ * behaviour of. Older iOS, Android and web keep the solid bar, since the
+ * component falls back to a plain transparent view where the effect does not
+ * exist, which would leave the tabs floating over the feed.
+ */
+const GLASS = isLiquidGlassAvailable();
 
 /**
  * The tab you are on shows its icon a size up and lowered into the middle of
@@ -45,10 +56,22 @@ export default function AppTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: {
-          backgroundColor: colors.backgroundElement,
-          borderTopColor: colors.backgroundSelected,
-        },
+        tabBarStyle: GLASS
+          ? {
+              // The glass has to sit over the content to have anything to
+              // refract; every screen already leaves BottomTabInset free at
+              // the bottom, so nothing ends up underneath it for good.
+              backgroundColor: 'transparent',
+              borderTopWidth: 0,
+              position: 'absolute',
+            }
+          : {
+              backgroundColor: colors.backgroundElement,
+              borderTopColor: colors.backgroundSelected,
+            },
+        tabBarBackground: GLASS
+          ? () => <GlassView glassEffectStyle="regular" style={StyleSheet.absoluteFill} />
+          : undefined,
       }}>
       <Tabs.Screen
         name="index"
